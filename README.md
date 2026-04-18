@@ -78,15 +78,15 @@ claude-codex-proxy auth status
 claude-codex-proxy serve
 ```
 
-Defaults to `http://127.0.0.1:11434` (loopback only). Override with
-`PORT=18765 claude-codex-proxy serve`.
+Defaults to `http://127.0.0.1:18765` (loopback only). Override with
+`PORT=11435 claude-codex-proxy serve`.
 
 ### 4. Point Claude Code at it
 
 One-shot:
 
 ```sh
-ANTHROPIC_BASE_URL=http://localhost:11434 \
+ANTHROPIC_BASE_URL=http://localhost:18765 \
 ANTHROPIC_AUTH_TOKEN=unused \
 ANTHROPIC_MODEL=gpt-5.4 \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
@@ -162,7 +162,7 @@ Key decisions:
 
 | Command                       | Description                               |
 | ----------------------------- | ----------------------------------------- |
-| [`serve`](#serve)             | Start the proxy on `PORT` (default 11434) |
+| [`serve`](#serve)             | Start the proxy on `PORT` (default 18765) |
 | [`auth login`](#auth-login)   | Browser OAuth (PKCE)                      |
 | [`auth device`](#auth-device) | Device-code OAuth (headless)              |
 | [`auth status`](#auth-status) | Show account ID and token expiry          |
@@ -178,7 +178,7 @@ Starts the HTTP proxy and blocks. Binds to `127.0.0.1` only. Logs to
 
 ```sh
 claude-codex-proxy serve
-PORT=18765 claude-codex-proxy serve
+PORT=11435 claude-codex-proxy serve
 CCP_LOG_STDERR=1 claude-codex-proxy serve
 ```
 
@@ -272,7 +272,7 @@ Settings are environment variables on the proxy process, not a config file.
 
 | Variable          | Default          | Purpose                         |
 | ----------------- | ---------------- | ------------------------------- |
-| `PORT`            | `11434`          | Proxy listen port               |
+| `PORT`            | `18765`          | Proxy listen port               |
 | `XDG_STATE_HOME`  | `~/.local/state` | Base dir for `proxy.log`        |
 | `CCP_LOG_STDERR` | unset            | Also mirror log lines to stderr |
 

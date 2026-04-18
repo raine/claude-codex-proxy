@@ -20,7 +20,7 @@ async function main() {
   switch (cmd) {
     case "serve":
     case undefined: {
-      const port = Number(process.env.PORT ?? 11434)
+      const port = Number(process.env.PORT ?? 18765)
       startServer({ port })
       console.log(`Proxy listening on http://localhost:${port}`)
       console.log(`Logs: ${logDir()}/proxy.log`)
@@ -74,7 +74,7 @@ async function main() {
 
 function usageAndExit(): never {
   console.log(`Usage:
-  claude-codex-proxy serve              Run proxy (PORT env, default 11434)
+  claude-codex-proxy serve              Run proxy (PORT env, default 18765)
   claude-codex-proxy auth login         Browser OAuth (PKCE)
   claude-codex-proxy auth device        Device-code OAuth
   claude-codex-proxy auth status        Show current auth
