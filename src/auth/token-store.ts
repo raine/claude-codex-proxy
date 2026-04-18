@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, chmod, unlink } from "node:fs/promises"
+import { mkdir, readFile, writeFile, chmod, unlink, rename } from "node:fs/promises"
 import { dirname, join } from "node:path"
 import { homedir } from "node:os"
 
@@ -24,12 +24,14 @@ export async function loadAuth(): Promise<StoredAuth | undefined> {
 
 export async function saveAuth(auth: StoredAuth): Promise<void> {
   await mkdir(dirname(FILE), { recursive: true })
-  await writeFile(FILE, JSON.stringify(auth, null, 2), "utf8")
+  const tmp = `${FILE}.${process.pid}.${Date.now()}.tmp`
+  await writeFile(tmp, JSON.stringify(auth, null, 2), { encoding: "utf8", mode: 0o600 })
   try {
-    await chmod(FILE, 0o600)
+    await chmod(tmp, 0o600)
   } catch {
-    // best-effort
+    // best-effort; mode in writeFile options usually suffices
   }
+  await rename(tmp, FILE)
 }
 
 export async function clearAuth(): Promise<void> {
