@@ -28,7 +28,7 @@ async function main() {
       console.log("Configure Claude Code:")
       console.log(`  export ANTHROPIC_BASE_URL="http://localhost:${port}"`)
       console.log(`  export ANTHROPIC_AUTH_TOKEN="anything"`)
-      console.log(`  export ANTHROPIC_MODEL="gpt-5.2-codex"`)
+      console.log(`  export ANTHROPIC_MODEL="gpt-5.4"`)
       console.log(`  export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"`)
       return
     }
