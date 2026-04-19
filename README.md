@@ -9,6 +9,8 @@ plugins, but you don't want to be limited to the Codex CLI or Opencode, this
 proxy makes Claude Code speak to OpenAI's Codex Responses backend using your
 ChatGPT OAuth session.
 
+<img src="meta/claude-code-screenshot.webp" alt="Claude Code running through claude-codex-proxy" width="630" />
+
 [Quick start](#quick-start) · [How it works](#how-it-works) ·
 [Configuration](#configuration) · [Limitations](#limitations)
 
@@ -133,8 +135,9 @@ These aliases are only shorthand for portability and cheaper subagent configs;
 they are not semantic equivalents of the Claude models they resemble.
 
 If the resolved model isn't supported by your account, upstream returns a 400
-like `"The 'gpt-4.1' model is not supported when using Codex with a ChatGPT
-account."`. The proxy surfaces that verbatim.
+like
+`"The 'gpt-4.1' model is not supported when using Codex with a ChatGPT account."`.
+The proxy surfaces that verbatim.
 
 For example, you can now point Claude Code or a subagent at the proxy with:
 
