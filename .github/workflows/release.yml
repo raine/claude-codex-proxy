@@ -26,7 +26,7 @@ jobs:
           - target: bun-linux-arm64
             platform: linux-arm64
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
@@ -47,7 +47,7 @@ jobs:
           archive="${BIN_NAME}-${{ matrix.platform }}.tar.gz"
           tar -C dist -czf "$archive" ${BIN_NAME}
           shasum -a 256 "$archive" > "${BIN_NAME}-${{ matrix.platform }}.sha256"
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         with:
           name: ${{ matrix.platform }}
           path: |
@@ -60,7 +60,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           merge-multiple: true
       - uses: softprops/action-gh-release@v2
@@ -75,10 +75,10 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v5
         with:
           merge-multiple: true
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           repository: raine/homebrew-claude-codex-proxy
           token: ${{ secrets.RELEASE_TOKEN }}
