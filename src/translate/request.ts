@@ -117,7 +117,7 @@ function mapToolChoice(
   }
 }
 
-function buildInstructions(system: AnthropicRequest["system"]): string | undefined {
+export function buildInstructions(system: AnthropicRequest["system"]): string | undefined {
   if (!system) return undefined
   const blocks: AnthropicTextBlock[] =
     typeof system === "string" ? [{ type: "text", text: system }] : system
@@ -181,7 +181,7 @@ function buildInput(messages: AnthropicMessage[]): ResponsesInputItem[] {
   return out
 }
 
-function normalizeContent(content: AnthropicMessage["content"]): AnthropicContentBlock[] {
+export function normalizeContent(content: AnthropicMessage["content"]): AnthropicContentBlock[] {
   if (typeof content === "string") return [{ type: "text", text: content }]
   return content
 }
@@ -191,7 +191,7 @@ function imageToUrl(block: Extract<AnthropicContentBlock, { type: "image" }>): s
   return `data:${block.source.media_type};base64,${block.source.data}`
 }
 
-function toolResultToString(
+export function toolResultToString(
   content: string | Array<AnthropicTextBlock | AnthropicImageBlock>,
 ): string {
   if (typeof content === "string") return content
