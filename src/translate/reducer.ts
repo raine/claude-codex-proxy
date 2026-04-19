@@ -251,10 +251,17 @@ export function mapUsageToAnthropic(u: CodexUsage | undefined): {
   cache_creation_input_tokens: number
   cache_read_input_tokens: number
 } {
+  const cachedTokens = u?.input_tokens_details?.cached_tokens ?? 0
+  const totalInputTokens = u?.input_tokens ?? 0
   return {
-    input_tokens: u?.input_tokens ?? 0,
+    // OpenAI-style usage reports cached prompt tokens inside input_tokens.
+    // Anthropic-style usage reports cache reads separately, and Claude Code
+    // sums input_tokens + cache_read_input_tokens when deciding context size.
+    // Subtract cached reads here so the downstream total matches the real
+    // prompt window instead of double-counting cached context.
+    input_tokens: Math.max(0, totalInputTokens - cachedTokens),
     output_tokens: u?.output_tokens ?? 0,
     cache_creation_input_tokens: 0,
-    cache_read_input_tokens: u?.input_tokens_details?.cached_tokens ?? 0,
+    cache_read_input_tokens: cachedTokens,
   }
 }
