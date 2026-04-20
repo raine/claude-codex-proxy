@@ -1,13 +1,14 @@
 # claude-code-proxy
 
 `claude-code-proxy` lets you use
-[Claude Code](https://www.anthropic.com/claude-code) with your ChatGPT Plus or
-Pro subscription.
+[Claude Code](https://www.anthropic.com/claude-code) with your **ChatGPT
+Plus/Pro** subscription or your **Kimi Code** (kimi.com) account.
 
 <img src="meta/claude-code-screenshot.webp" alt="Claude Code running through claude-code-proxy" width="630" />
 
-[Quick start](#quick-start) · [How it works](#how-it-works) ·
-[Configuration](#configuration) · [Limitations](#limitations)
+[Quick start](#quick-start) · [Providers](#providers) ·
+[How it works](#how-it-works) · [Configuration](#configuration) ·
+[Limitations](#limitations)
 
 ## Why?
 
@@ -39,47 +40,80 @@ curl -fsSL https://raw.githubusercontent.com/raine/claude-code-proxy/main/script
 **Manual:** download a prebuilt binary for your platform from the
 [releases page](https://github.com/raine/claude-code-proxy/releases).
 
-### 2. Authenticate with ChatGPT
+### 2. Pick a provider and authenticate
 
-Open a browser (PKCE flow):
+The proxy supports two upstream providers. Pick one and run its login flow; the
+proxy will refuse to start traffic until a token is stored.
 
-```sh
-claude-code-proxy codex auth login
-```
-
-Or, on a headless machine (device code flow):
+**Codex (ChatGPT Plus/Pro):**
 
 ```sh
-claude-code-proxy codex auth device
+claude-code-proxy codex auth login     # browser OAuth (PKCE)
+# or, on a headless machine:
+claude-code-proxy codex auth device    # device-code flow
 ```
 
-Either command prints a URL. Sign in with your **ChatGPT Plus/Pro account**. On
-macOS, credentials are stored in Keychain. On other platforms, they are stored
-locally for reuse by the proxy.
+Sign in with your **ChatGPT Plus/Pro account**, not an OpenAI API account.
 
-Verify it stuck:
+**Kimi (kimi.com Kimi Code):**
+
+```sh
+claude-code-proxy kimi auth login      # device-code flow (prints URL + code)
+```
+
+Sign in with your **kimi.com account**. The verification URL is displayed; open
+it in any browser, confirm the code, and the CLI polls until done.
+
+On macOS credentials go to Keychain; on other platforms they are written to
+`~/.config/claude-code-proxy/<provider>/auth.json` (mode 0600).
+
+Verify:
 
 ```sh
 claude-code-proxy codex auth status
+claude-code-proxy kimi auth status
 ```
 
 ### 3. Start the proxy
 
 ```sh
-claude-code-proxy serve
+claude-code-proxy serve                # listens on 127.0.0.1:18765
+PORT=11435 claude-code-proxy serve     # change the listen port
 ```
 
-Defaults to `http://127.0.0.1:18765` (loopback only). Override with
-`PORT=11435 claude-code-proxy serve`.
+Binds to `127.0.0.1` only. One `serve` process handles all providers — the
+upstream for each request is chosen from `ANTHROPIC_MODEL`.
 
 ### 4. Point Claude Code at it
 
-One-shot:
+`ANTHROPIC_MODEL` selects the provider:
+
+- `gpt-5.4`, `gpt-5.3-codex`, `gpt-5.4-mini`, `gpt-5.2` → **codex**
+- `kimi-for-coding`, `kimi-k2.6`, `k2.6` → **kimi**
+
+An unknown model returns a 400 listing the supported ids. There is no
+implicit default provider.
+
+Claude Code also issues background requests (session title generation, token
+counts) against its built-in "small/fast" haiku model id. Those requests
+would 400 because no provider claims it, so set
+`ANTHROPIC_SMALL_FAST_MODEL` to a concrete id too (the same value as
+`ANTHROPIC_MODEL` is usually fine):
 
 ```sh
+# Codex
 ANTHROPIC_BASE_URL=http://localhost:18765 \
 ANTHROPIC_AUTH_TOKEN=unused \
 ANTHROPIC_MODEL=gpt-5.4 \
+ANTHROPIC_SMALL_FAST_MODEL=gpt-5.4-mini \
+CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
+  claude
+
+# Kimi
+ANTHROPIC_BASE_URL=http://localhost:18765 \
+ANTHROPIC_AUTH_TOKEN=unused \
+ANTHROPIC_MODEL=kimi-for-coding \
+ANTHROPIC_SMALL_FAST_MODEL=kimi-for-coding \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   claude
 ```
@@ -92,6 +126,7 @@ Or set it persistently in `~/.claude/settings.json`:
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:18765",
     "ANTHROPIC_AUTH_TOKEN": "unused",
     "ANTHROPIC_MODEL": "gpt-5.4",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.4-mini",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1
   }
 }
@@ -100,17 +135,17 @@ Or set it persistently in `~/.claude/settings.json`:
 ### 5. Optional: disable Claude Code auto-compact
 
 Claude Code decides auto-compaction locally based on the model context window it
-thinks it has. If your upstream Codex model supports a larger window than
-Claude Code assumes, Claude Code may compact earlier than necessary.
+thinks it has. If the upstream model supports a larger window than Claude Code
+assumes, it may compact earlier than necessary.
 
-As a workaround, you can disable only automatic compaction and keep manual
-`/compact` available:
+Disable only automatic compaction while keeping manual `/compact` available:
 
 ```sh
 DISABLE_AUTO_COMPACT=1 \
 ANTHROPIC_BASE_URL=http://localhost:18765 \
 ANTHROPIC_AUTH_TOKEN=unused \
 ANTHROPIC_MODEL=gpt-5.4 \
+ANTHROPIC_SMALL_FAST_MODEL=gpt-5.4-mini \
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1 \
   claude
 ```
@@ -123,6 +158,7 @@ Or add it to `~/.claude/settings.json`:
     "ANTHROPIC_BASE_URL": "http://127.0.0.1:18765",
     "ANTHROPIC_AUTH_TOKEN": "unused",
     "ANTHROPIC_MODEL": "gpt-5.4",
+    "ANTHROPIC_SMALL_FAST_MODEL": "gpt-5.4-mini",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
     "DISABLE_AUTO_COMPACT": 1
   }
@@ -136,7 +172,11 @@ Tradeoffs:
 - If you let the session grow too far, you may hit prompt-too-long failures
   instead of a graceful auto-compact.
 
-## Supported models
+## Providers
+
+### Codex (ChatGPT)
+
+Upstream: `https://chatgpt.com/backend-api/codex/responses` (Responses API).
 
 Set `ANTHROPIC_MODEL` to a model your ChatGPT subscription is allowed to use.
 Confirmed working on **Plus**:
@@ -144,33 +184,48 @@ Confirmed working on **Plus**:
 - `gpt-5.4`
 - `gpt-5.3-codex`
 
-Also verified working on this project:
+Also verified:
 
 - `gpt-5.2`
 - `gpt-5.4-mini`
-
-The proxy also accepts a small set of convenience aliases and resolves them
-before calling the upstream Codex backend:
-
-- `haiku`, `claude-haiku-4-5`, `claude-haiku-4-5-20251001` → `gpt-5.4-mini`
-- `sonnet`, `claude-sonnet-4-6` → `gpt-5.4`
-- `opus`, `claude-opus-4-7` → `gpt-5.4`
-
-These aliases are only shorthand for portability and cheaper subagent configs;
-they are not semantic equivalents of the Claude models they resemble.
 
 If the resolved model isn't supported by your account, upstream returns a 400
 like
 `"The 'gpt-4.1' model is not supported when using Codex with a ChatGPT account."`.
 The proxy surfaces that verbatim.
 
-For example, you can now point Claude Code or a subagent at the proxy with:
+Auth:
 
-```sh
-ANTHROPIC_MODEL=haiku claude
-```
+| Command             | What it does                               |
+| ------------------- | ------------------------------------------ |
+| `codex auth login`  | Browser OAuth (PKCE) via `auth.openai.com` |
+| `codex auth device` | Device-code OAuth for headless machines    |
+| `codex auth status` | Show account ID + token expiry             |
+| `codex auth logout` | Delete stored credentials                  |
 
-and the proxy will send `gpt-5.4-mini` upstream.
+### Kimi (Kimi Code)
+
+Upstream: `https://api.kimi.com/coding/v1/chat/completions` (OpenAI-style
+chat-completions).
+
+Only one wire model is exposed: `kimi-for-coding` (its display name in kimi-cli
+is **Kimi-k2.6**, 256k context, supports reasoning + image input + video input).
+`kimi-k2.6` and `k2.6` are accepted as aliases for the same wire id.
+
+Reasoning effort: Claude Code's `output_config.effort` value (the one you see in
+the UI as `◐ medium · /effort`) is forwarded as Kimi's `reasoning_effort` (`low`
+/ `medium` / `high`). Thinking blocks from the upstream model are forwarded to
+Claude Code and rendered as thinking content. If Claude Code disables thinking,
+the proxy drops both `reasoning_effort` and the `thinking: {type: "enabled"}`
+flag before forwarding.
+
+Auth:
+
+| Command            | What it does                          |
+| ------------------ | ------------------------------------- |
+| `kimi auth login`  | Device-code OAuth via `auth.kimi.com` |
+| `kimi auth status` | Show user ID + token expiry           |
+| `kimi auth logout` | Delete stored credentials             |
 
 ## How it works
 
@@ -179,34 +234,32 @@ sequenceDiagram
     autonumber
     participant CC as Claude Code
     participant P as claude-code-proxy
-    participant AUTH as auth.openai.com
-    participant CGX as chatgpt.com/<br/>backend-api/codex
+    participant AUTH as OAuth host<br/>(auth.openai.com or<br/>auth.kimi.com)
+    participant U as Upstream API<br/>(chatgpt.com/codex or<br/>api.kimi.com)
 
-    Note over P,AUTH: One-time: PKCE or device OAuth<br/>tokens cached locally for reuse
+    Note over P,AUTH: One-time: PKCE / device OAuth<br/>tokens cached locally for reuse
 
     CC->>P: POST /v1/messages (Anthropic shape, stream: true)
 
     alt access token expiring
         P->>AUTH: POST /oauth/token (refresh_token)
-        AUTH-->>P: new access + refresh
+        AUTH-->>P: new access (+ rotated refresh)
     end
 
-    P->>P: translate request<br/>• strip max_tokens / temperature / cache_control<br/>• system blocks → top-level "instructions"<br/>• tool_use.id = call_id (identity)<br/>• prompt_cache_key = session id
-    P->>CGX: POST /responses<br/>Bearer + ChatGPT-Account-Id + originator=claude-code-proxy
-    CGX-->>P: Responses API SSE<br/>(output_item.*, output_text.delta, function_call_arguments.*, codex.rate_limits, response.completed)
-    P->>P: reducer: typed events<br/>(text/tool start/delta/stop, finish)
+    P->>P: translate request<br/>• strip Anthropic-only fields<br/>• system blocks → instructions / system message<br/>• tool_use / tool_result ↔ provider-specific shapes<br/>• prompt_cache_key = session id
+    P->>U: POST upstream<br/>Bearer + provider-specific headers
+    U-->>P: provider SSE<br/>(Codex: output_item.*, output_text.delta, …)<br/>(Kimi: chat.completion.chunk, reasoning_content, …)
+    P->>P: reducer: typed events<br/>(thinking / text / tool start/delta/stop, finish)
     P-->>CC: Anthropic SSE<br/>(message_start, content_block_*, message_delta, message_stop)
 ```
 
 ## Commands
 
-| Command                             | Description                               |
-| ----------------------------------- | ----------------------------------------- |
-| [`serve`](#serve)                   | Start the proxy on `PORT` (default 18765) |
-| [`codex auth login`](#auth-login)   | Browser OAuth (PKCE)                      |
-| [`codex auth device`](#auth-device) | Device-code OAuth (headless)              |
-| [`codex auth status`](#auth-status) | Show account ID and token expiry          |
-| [`codex auth logout`](#auth-logout) | Delete stored auth credentials            |
+| Command                                             | Description               |
+| --------------------------------------------------- | ------------------------- |
+| [`serve`](#serve)                                   | Start the proxy on `PORT` |
+| `codex auth login` / `device` / `status` / `logout` | Codex OAuth management    |
+| `kimi  auth login` / `status` / `logout`            | Kimi OAuth management     |
 
 ---
 
@@ -222,15 +275,16 @@ PORT=11435 claude-code-proxy serve
 CCP_LOG_STDERR=1 claude-code-proxy serve
 ```
 
-Prints the exact `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` env vars to export on
-startup. Refuses to start traffic until `codex auth login` (or `codex auth
-device`) has stored a token.
-
-Selects a provider with `CCP_PROVIDER` (default `codex`).
+Prints the supported model → provider mapping on startup. One `serve` process
+dispatches to any provider based on the `model` field in each request.
+Requests whose model isn't registered with any provider are rejected with
+HTTP 400 listing the supported ids.
 
 ---
 
-### `codex auth login`
+### Codex auth commands
+
+#### `codex auth login`
 
 Runs the PKCE browser flow against `auth.openai.com` using the Codex CLI's
 client ID. Prints a URL, opens a local callback listener on port 1455, waits for
@@ -246,9 +300,7 @@ Sign in with your **ChatGPT Plus/Pro account**, not an OpenAI API account. The
 token file includes the extracted `chatgpt_account_id` so the proxy can set the
 `ChatGPT-Account-Id` header on every upstream call.
 
----
-
-### `codex auth device`
+#### `codex auth device`
 
 Same OAuth flow, but for headless machines. Prints a short user code and a URL;
 you enter the code from any browser on any other device, and the CLI polls
@@ -260,9 +312,7 @@ claude-code-proxy codex auth device
 
 Useful over SSH, inside a container, or on any host that can't open a browser.
 
----
-
-### `codex auth status`
+#### `codex auth status`
 
 Shows whether credentials are stored, the account ID, and how long until the
 access token expires. Non-zero exit if no auth is present.
@@ -283,9 +333,7 @@ The proxy refreshes the access token 5 minutes before expiry with a
 single-flight guard, so concurrent requests never trigger stampedes of refresh
 calls.
 
----
-
-### `codex auth logout`
+#### `codex auth logout`
 
 Removes stored auth credentials. On macOS this deletes the Keychain entry. No
 server call is needed; the refresh token just becomes dead.
@@ -295,6 +343,47 @@ claude-code-proxy codex auth logout
 ```
 
 Run `codex auth login` again to re-authenticate.
+
+---
+
+### Kimi auth commands
+
+#### `kimi auth login`
+
+Runs a device-code OAuth flow (RFC 8628) against `auth.kimi.com` using the
+kimi-cli client ID. Prints a verification URL and a short user code; open the
+URL in any browser, confirm the code, and the CLI polls until the tokens are
+issued. Tokens are stored in Keychain on macOS or a mode-0600 file elsewhere.
+
+```sh
+claude-code-proxy kimi auth login
+```
+
+Sign in with your **kimi.com account**. The access token has a ~15 minute
+lifetime; the proxy refreshes it 5 minutes before expiry with a single-flight
+guard and persists the rotated refresh token.
+
+A persistent device ID is generated on first login at
+`~/.config/claude-code-proxy/kimi/device_id` and reused forever — it's bound
+into the issued JWT, so rotating it would invalidate your token.
+
+#### `kimi auth status`
+
+```sh
+claude-code-proxy kimi auth status
+```
+
+Shows the user ID extracted from the token, expiry time, scope, and storage
+backend. Non-zero exit if no auth is present.
+
+#### `kimi auth logout`
+
+```sh
+claude-code-proxy kimi auth logout
+```
+
+Removes stored auth credentials (Keychain entry on macOS, file elsewhere). Run
+`kimi auth login` again to re-authenticate.
 
 ---
 
@@ -312,45 +401,57 @@ The proxy speaks enough of the Anthropic API for Claude Code:
 
 Settings are environment variables on the proxy process, not a config file.
 
-| Variable          | Default          | Purpose                                            |
-| ----------------- | ---------------- | -------------------------------------------------- |
-| `PORT`            | `18765`          | Proxy listen port                                  |
-| `CCP_PROVIDER`    | `codex`          | Upstream provider (`codex`)                        |
-| `XDG_STATE_HOME`  | `~/.local/state` | Base dir for `proxy.log`                           |
-| `CCP_LOG_STDERR`  | unset            | Also mirror log lines to stderr                    |
-| `CCP_LOG_VERBOSE` | unset            | Log full request/response bodies + every SSE event |
+| Variable          | Default                          | Purpose                                            |
+| ----------------- | -------------------------------- | -------------------------------------------------- |
+| `PORT`            | `18765`                          | Proxy listen port                                  |
+| `XDG_STATE_HOME`  | `~/.local/state`                 | Base dir for `proxy.log`                           |
+| `CCP_LOG_STDERR`  | unset                            | Also mirror log lines to stderr                    |
+| `CCP_LOG_VERBOSE` | unset                            | Log full request/response bodies + every SSE event |
+| `KIMI_OAUTH_HOST` | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)        |
+| `KIMI_BASE_URL`   | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                       |
 
 ### Files
 
-- `$XDG_STATE_HOME/claude-code-proxy/proxy.log`: JSON-lines log, rotated at 20
+- `$XDG_STATE_HOME/claude-code-proxy/proxy.log` — JSON-lines log, rotated at 20
   MiB. Secrets (`authorization`, `access`, `refresh`, `id_token`,
   `ChatGPT-Account-Id`, …) are redacted before write.
+- `~/.config/claude-code-proxy/codex/auth.json` — codex tokens (non-macOS; macOS
+  uses Keychain under service `claude-code-proxy.codex`).
+- `~/.config/claude-code-proxy/kimi/auth.json` — kimi tokens (non-macOS; macOS
+  uses Keychain under service `claude-code-proxy.kimi`).
+- `~/.config/claude-code-proxy/kimi/device_id` — persistent UUID bound into the
+  Kimi JWT at login. Reused for the lifetime of the install.
 
 ## Limitations
 
-- **Terms of service:** using the Codex backend from a non-official client is
-  the same gray area OpenCode occupies, although OpenAI seems to be cool with
-  OpenCode. Use at your own risk.
-- **Rate limits:** shared across all clients of your ChatGPT account.
-  `codex.rate_limits.limit_reached` is surfaced as HTTP 429 with `retry-after`.
-- **Image inputs in tool results:** Responses API `function_call_output` only
-  takes a string, so image blocks nested inside `tool_result` are replaced with
-  a `[image omitted: <media_type>]` placeholder. Top-level user-message images
-  do pass through.
-- **Reasoning blocks:** not forwarded to Claude Code (dropped), even if the
-  upstream model produced them.
+- **Terms of service:** using the Codex or Kimi backends from a non-official
+  client is a gray area. Use at your own risk.
+- **Rate limits:** shared across all clients of your upstream account. Codex's
+  `codex.rate_limits.limit_reached` and Kimi's HTTP 429 are both surfaced as
+  HTTP 429 with `retry-after`.
+- **Codex — image inputs in tool results:** Responses API `function_call_output`
+  only takes a string, so image blocks nested inside `tool_result` are replaced
+  with a `[image omitted: <media_type>]` placeholder. Top-level user-message
+  images pass through.
+- **Kimi — image inputs in tool results:** pass through as `image_url` parts
+  (Kimi accepts them in `role:"tool"` content).
+- **Codex — reasoning blocks:** not forwarded to Claude Code (dropped), even if
+  the upstream model produced them.
+- **Kimi — reasoning blocks:** forwarded as Anthropic `thinking` content blocks
+  and rendered by Claude Code. Disable by setting
+  `thinking: {"type":"disabled"}` in your Anthropic request.
 - **Session title generation:** Claude Code's parallel title-gen request is
-  forwarded to Codex like any other structured-output request. This costs a
+  forwarded upstream like any other structured-output request. This costs a
   handful of tokens per session rather than being stubbed.
-- **OpenAI-flavored `output_config.format`:** translated to Responses API
-  `text.format` (json_schema with `strict: true`); other Anthropic-specific
-  `output_config` fields are dropped.
+- **Codex — `output_config.format`:** translated to Responses API `text.format`
+  (json_schema with `strict: true`); other Anthropic-specific `output_config`
+  fields are dropped.
 
 ## Development
 
 ```sh
-bunx tsc --noEmit     # typecheck
-bun src/cli.ts serve  # run locally
+bunx tsc --noEmit                          # typecheck
+bun src/cli.ts serve                       # run locally (routes all providers)
 tail -f ~/.local/state/claude-code-proxy/proxy.log | jq .
 ```
 
@@ -370,3 +471,5 @@ bun build ./src/cli.ts --compile --outfile ~/.local/bin/claude-code-proxy
   hunk-level git staging for AI agents
 - [workmux](https://github.com/raine/workmux): manage parallel AI coding tasks
   in separate git worktrees with tmux
+- [consult-llm-mcp](https://github.com/raine/consult-llm-mcp): MCP server for
+  consulting external LLMs (Gemini, Codex, etc.) from inside Claude Code
