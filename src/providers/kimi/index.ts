@@ -28,7 +28,7 @@ function jsonError(status: number, type: string, message: string): Response {
 async function handleCountTokens(body: AnthropicRequest, ctx: RequestContext): Promise<Response> {
   const resolvedModel = resolveModel(body.model)
   const translated = translateRequest({ ...body, model: resolvedModel })
-  const tokens = countTranslatedTokens(translated)
+  const tokens = countTranslatedTokens(translated.body)
   log.debug("count_tokens", { reqId: ctx.reqId, tokens })
   return new Response(JSON.stringify({ input_tokens: tokens }), {
     headers: { "content-type": "application/json" },
@@ -71,25 +71,34 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
     { sessionId: ctx.sessionId },
   )
   const localInputTokens = VERBOSE ? countTokens(body) : undefined
-  const translatedInputTokens = VERBOSE ? countTranslatedTokens(translated) : undefined
+  const translatedInputTokens = VERBOSE ? countTranslatedTokens(translated.body) : undefined
+  if (translated.thinking.degraded) {
+    log.warn("thinking degraded", {
+      reqId: ctx.reqId,
+      sessionId: ctx.sessionId,
+      reason: "prior assistant tool_call turn has no reasoning_content",
+    })
+  }
   log.debug("translated request", {
     reqId: ctx.reqId,
     requestedModel: body.model,
     resolvedModel,
-    messageCount: translated.messages.length,
-    toolCount: translated.tools?.length ?? 0,
+    messageCount: translated.body.messages.length,
+    toolCount: translated.body.tools?.length ?? 0,
     localInputTokens,
     translatedInputTokens,
-    promptCacheKey: translated.prompt_cache_key,
-    reasoningEffort: translated.reasoning_effort,
-    thinking: translated.thinking?.type,
-    maxTokens: translated.max_tokens,
+    promptCacheKey: translated.body.prompt_cache_key,
+    reasoningEffort: translated.body.reasoning_effort,
+    thinkingRequested: translated.thinking.requested,
+    thinkingEffective: translated.thinking.effective,
+    thinkingDegraded: translated.thinking.degraded,
+    maxTokens: translated.body.max_tokens,
   })
-  if (VERBOSE) log.debug("translated request body", { reqId: ctx.reqId, body: translated })
+  if (VERBOSE) log.debug("translated request body", { reqId: ctx.reqId, body: translated.body })
 
   let upstream
   try {
-    upstream = await postKimi(translated, { sessionId: ctx.sessionId, signal: ctx.signal })
+    upstream = await postKimi(translated.body, { sessionId: ctx.sessionId, signal: ctx.signal })
   } catch (err) {
     if (err instanceof KimiError) {
       log.warn("kimi error", { reqId: ctx.reqId, status: err.status, detail: err.detail })

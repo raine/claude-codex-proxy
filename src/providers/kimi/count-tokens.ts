@@ -24,6 +24,8 @@ export function countTokens(req: AnthropicRequest): number {
         total += encode(JSON.stringify(block.input ?? {})).length
       } else if (block.type === "tool_result") {
         total += encode(toolResultToString(block.content)).length
+      } else if (block.type === "thinking") {
+        total += encode(block.thinking).length
       }
     }
   }
@@ -53,6 +55,7 @@ export function countTranslatedTokens(req: KimiChatRequest): number {
       }
     } else if (m.role === "assistant") {
       if (typeof m.content === "string") total += encode(m.content).length
+      if (m.reasoning_content) total += encode(m.reasoning_content).length
       for (const tc of m.tool_calls ?? []) {
         total += encode(tc.function.name).length
         total += encode(tc.function.arguments).length

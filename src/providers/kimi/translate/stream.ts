@@ -1,6 +1,7 @@
 import { encodeSseEvent } from "../../../sse.ts"
 import { createLogger } from "../../../log.ts"
 import { mapUsageToAnthropic, reduceUpstream, UpstreamStreamError } from "./reducer.ts"
+import { makeThinkingSignature } from "./signature.ts"
 
 const log = createLogger("kimi.stream")
 
@@ -74,6 +75,18 @@ export function translateStream(
               })
               break
             case "thinking-stop":
+              // Emit the signature as a separate signature_delta right
+              // before content_block_stop — matches Anthropic's native
+              // wire format and keeps Claude Code's thinking-block parser
+              // happy on round-trip.
+              emit("content_block_delta", {
+                type: "content_block_delta",
+                index: e.index,
+                delta: {
+                  type: "signature_delta",
+                  signature: makeThinkingSignature(opts.messageId, e.index),
+                },
+              })
               emit("content_block_stop", { type: "content_block_stop", index: e.index })
               break
             case "text-start":

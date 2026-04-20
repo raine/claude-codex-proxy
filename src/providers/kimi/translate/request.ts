@@ -29,14 +29,17 @@ export type KimiToolChoice =
   | "required"
   | { type: "function"; function: { name: string } }
 
+export type KimiAssistantMessage = {
+  role: "assistant"
+  content?: string | null
+  reasoning_content?: string
+  tool_calls?: KimiAssistantToolCall[]
+}
+
 export type KimiMessage =
   | { role: "system"; content: string }
   | { role: "user"; content: string | KimiUserContentPart[] }
-  | {
-      role: "assistant"
-      content?: string | null
-      tool_calls?: KimiAssistantToolCall[]
-    }
+  | KimiAssistantMessage
   | { role: "tool"; tool_call_id: string; content: string | KimiToolResultPart[] }
 
 export type KimiUserContentPart =
@@ -62,17 +65,31 @@ export interface TranslateOptions {
   sessionId?: string
 }
 
+export interface TranslateResult {
+  body: KimiChatRequest
+  thinking: {
+    requested: boolean
+    effective: boolean
+    degraded: boolean
+  }
+}
+
 const DEFAULT_MAX_TOKENS = 32000
 
 export function translateRequest(
   req: AnthropicRequest,
   opts: TranslateOptions = {},
-): KimiChatRequest {
-  const messages = buildMessages(req)
-  const tools = req.tools?.map(toKimiTool)
+): TranslateResult {
+  const requested = req.thinking?.type === "enabled"
+  // Kimi rejects requests where any prior assistant-tool-call turn lacks
+  // reasoning_content while thinking is enabled. If the history doesn't
+  // carry reasoning we must degrade this turn to non-thinking rather than
+  // 400 the user.
+  const degraded = requested && hasToolCallTurnWithoutThinking(req.messages)
+  const effective = requested && !degraded
 
-  const thinkingDisabled = req.thinking?.type === "disabled"
-  const effort = req.output_config?.effort ?? "high"
+  const messages = buildMessages(req, { includeReasoning: effective })
+  const tools = req.tools?.map(toKimiTool)
 
   const out: KimiChatRequest = {
     model: req.model,
@@ -81,15 +98,30 @@ export function translateRequest(
     stream_options: { include_usage: true },
     max_tokens: clampMaxTokens(req.max_tokens),
   }
-  if (!thinkingDisabled) {
-    out.reasoning_effort = effort
+  if (effective) {
+    out.reasoning_effort = req.output_config?.effort ?? "medium"
     out.thinking = { type: "enabled" }
   }
   if (tools && tools.length) out.tools = tools
   const tool_choice = mapToolChoice(req.tool_choice)
   if (tool_choice !== "auto") out.tool_choice = tool_choice
   if (opts.sessionId) out.prompt_cache_key = opts.sessionId
-  return out
+  return {
+    body: out,
+    thinking: { requested, effective, degraded },
+  }
+}
+
+function hasToolCallTurnWithoutThinking(messages: AnthropicMessage[]): boolean {
+  for (const msg of messages) {
+    if (msg.role !== "assistant") continue
+    const blocks = normalizeContent(msg.content)
+    const hasToolCall = blocks.some((b) => b.type === "tool_use")
+    if (!hasToolCall) continue
+    const hasThinking = blocks.some((b) => b.type === "thinking" && (b as { thinking?: string }).thinking)
+    if (!hasThinking) return true
+  }
+  return false
 }
 
 function clampMaxTokens(requested: number | undefined): number {
@@ -125,7 +157,10 @@ export function buildSystemMessage(system: AnthropicRequest["system"]): string |
   return texts.join("\n\n")
 }
 
-function buildMessages(req: AnthropicRequest): KimiMessage[] {
+function buildMessages(
+  req: AnthropicRequest,
+  opts: { includeReasoning: boolean },
+): KimiMessage[] {
   const out: KimiMessage[] = []
   const system = buildSystemMessage(req.system)
   if (system) out.push({ role: "system", content: system })
@@ -135,7 +170,7 @@ function buildMessages(req: AnthropicRequest): KimiMessage[] {
     if (msg.role === "user") {
       pushUserMessages(out, blocks)
     } else {
-      pushAssistantMessage(out, blocks)
+      pushAssistantMessage(out, blocks, opts.includeReasoning)
     }
   }
   return out
@@ -180,12 +215,19 @@ function pushUserMessages(out: KimiMessage[], blocks: AnthropicContentBlock[]): 
   flushBuffer()
 }
 
-function pushAssistantMessage(out: KimiMessage[], blocks: AnthropicContentBlock[]): void {
+function pushAssistantMessage(
+  out: KimiMessage[],
+  blocks: AnthropicContentBlock[],
+  includeReasoning: boolean,
+): void {
   const textParts: string[] = []
+  const thinkingParts: string[] = []
   const toolCalls: KimiAssistantToolCall[] = []
   for (const block of blocks) {
     if (block.type === "text") {
       if (block.text) textParts.push(block.text)
+    } else if (block.type === "thinking") {
+      if (includeReasoning && block.thinking) thinkingParts.push(block.thinking)
     } else if (block.type === "tool_use") {
       toolCalls.push({
         id: block.id,
@@ -196,15 +238,18 @@ function pushAssistantMessage(out: KimiMessage[], blocks: AnthropicContentBlock[
         },
       })
     }
-    // thinking / image blocks from the assistant are dropped — Kimi's
-    // assistant schema does not express them.
+    // image blocks from the assistant are dropped — Kimi's assistant
+    // schema does not express them.
   }
 
-  if (!textParts.length && !toolCalls.length) return
+  if (!textParts.length && !toolCalls.length && !thinkingParts.length) return
 
-  const msg: Extract<KimiMessage, { role: "assistant" }> = { role: "assistant" }
-  if (textParts.length) msg.content = textParts.join("")
-  else msg.content = ""
+  const msg: KimiAssistantMessage = { role: "assistant" }
+  msg.content = textParts.length ? textParts.join("") : ""
+  // Kimi accepts one reasoning_content string per assistant turn. If a turn
+  // has multiple interleaved thinking blocks we concatenate in order —
+  // exact block/tool_use pairing can't be preserved over the wire.
+  if (thinkingParts.length) msg.reasoning_content = thinkingParts.join("\n\n")
   if (toolCalls.length) msg.tool_calls = toolCalls
   out.push(msg)
 }

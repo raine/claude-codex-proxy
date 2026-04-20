@@ -1,4 +1,5 @@
 import { mapUsageToAnthropic, reduceUpstream, type KimiUsage } from "./reducer.ts"
+import { makeThinkingSignature } from "./signature.ts"
 
 export { UpstreamStreamError } from "./reducer.ts"
 
@@ -9,7 +10,7 @@ export interface AnthropicNonStreamResponse {
   model: string
   content: Array<
     | { type: "text"; text: string }
-    | { type: "thinking"; thinking: string }
+    | { type: "thinking"; thinking: string; signature: string }
     | { type: "tool_use"; id: string; name: string; input: unknown }
   >
   stop_reason: "end_turn" | "tool_use" | "max_tokens" | null
@@ -88,7 +89,12 @@ export async function accumulateResponse(
     const b = blocks.get(i)
     if (!b) continue
     if (b.kind === "thinking") {
-      if (b.text) content.push({ type: "thinking", thinking: b.text })
+      if (b.text)
+        content.push({
+          type: "thinking",
+          thinking: b.text,
+          signature: makeThinkingSignature(opts.messageId, i),
+        })
     } else if (b.kind === "text") {
       if (b.text) content.push({ type: "text", text: b.text })
     } else {

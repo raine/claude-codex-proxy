@@ -25,11 +25,18 @@ export interface AnthropicToolResultBlock {
   is_error?: boolean
 }
 
+export interface AnthropicThinkingBlock {
+  type: "thinking"
+  thinking: string
+  signature?: string
+}
+
 export type AnthropicContentBlock =
   | AnthropicTextBlock
   | AnthropicImageBlock
   | AnthropicToolUseBlock
   | AnthropicToolResultBlock
+  | AnthropicThinkingBlock
 
 export interface AnthropicMessage {
   role: "user" | "assistant"
