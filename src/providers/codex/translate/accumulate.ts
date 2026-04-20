@@ -1,5 +1,6 @@
 import { mapUsageToAnthropic, reduceUpstream } from "./reducer.ts"
 import type { CodexUsage } from "./reducer.ts"
+import type { Logger } from "../../../log.ts"
 
 export { UpstreamStreamError } from "./reducer.ts"
 
@@ -35,7 +36,7 @@ export interface AccumulatedResponse {
  */
 export async function accumulateResponse(
   upstream: ReadableStream<Uint8Array>,
-  opts: { messageId: string; model: string },
+  opts: { messageId: string; model: string; log: Logger },
 ): Promise<AccumulatedResponse> {
   type Block =
     | { kind: "text"; text: string }
@@ -47,7 +48,7 @@ export async function accumulateResponse(
   let usage: ReturnType<typeof mapUsageToAnthropic> | undefined
   let rawUsage: CodexUsage | undefined
 
-  for await (const e of reduceUpstream(upstream)) {
+  for await (const e of reduceUpstream(upstream, opts.log)) {
     switch (e.kind) {
       case "text-start":
         blocks.set(e.index, { kind: "text", text: "" })

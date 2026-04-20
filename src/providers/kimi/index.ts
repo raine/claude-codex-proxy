@@ -1,6 +1,5 @@
 import type { Provider, CliHandlers, RequestContext } from "../types.ts"
 import type { AnthropicRequest } from "../../anthropic/schema.ts"
-import { createLogger } from "../../log.ts"
 import {
   assertAllowedModel,
   ModelNotAllowedError,
@@ -15,7 +14,6 @@ import { runDeviceLogin } from "./auth/login.ts"
 import { persistInitialTokens } from "./auth/manager.ts"
 import { loadAuth, clearAuth, authPath } from "./auth/token-store.ts"
 
-const log = createLogger("provider.kimi")
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
 function jsonError(status: number, type: string, message: string): Response {
@@ -26,31 +24,31 @@ function jsonError(status: number, type: string, message: string): Response {
 }
 
 async function handleCountTokens(body: AnthropicRequest, ctx: RequestContext): Promise<Response> {
+  const log = ctx.childLogger("provider.kimi")
   const resolvedModel = resolveModel(body.model)
   const translated = translateRequest({ ...body, model: resolvedModel })
   const tokens = countTranslatedTokens(translated)
-  log.debug("count_tokens", { reqId: ctx.reqId, tokens })
+  log.debug("count_tokens", { tokens })
   return new Response(JSON.stringify({ input_tokens: tokens }), {
     headers: { "content-type": "application/json" },
   })
 }
 
 async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Promise<Response> {
+  const log = ctx.childLogger("provider.kimi")
   const messageId = `msg_${crypto.randomUUID().replace(/-/g, "")}`
   const wantStream = body.stream !== false
   const messageCount = body.messages?.length ?? 0
   const toolCount = body.tools?.length ?? 0
 
   log.debug("anthropic request", {
-    reqId: ctx.reqId,
     model: body.model,
     messageCount,
     toolCount,
     stream: wantStream,
-    sessionId: ctx.sessionId,
     requestedMaxTokens: body.max_tokens,
   })
-  if (VERBOSE) log.debug("anthropic request body", { reqId: ctx.reqId, body })
+  if (VERBOSE) log.debug("anthropic request body", { body })
 
   const resolvedModel = resolveModel(body.model)
   try {
@@ -73,7 +71,6 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
   const localInputTokens = VERBOSE ? countTokens(body) : undefined
   const translatedInputTokens = VERBOSE ? countTranslatedTokens(translated) : undefined
   log.debug("translated request", {
-    reqId: ctx.reqId,
     requestedModel: body.model,
     resolvedModel,
     messageCount: translated.messages.length,
@@ -85,14 +82,14 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
     thinking: translated.thinking?.type,
     maxTokens: translated.max_tokens,
   })
-  if (VERBOSE) log.debug("translated request body", { reqId: ctx.reqId, body: translated })
+  if (VERBOSE) log.debug("translated request body", { body: translated })
 
   let upstream
   try {
-    upstream = await postKimi(translated, { sessionId: ctx.sessionId, signal: ctx.signal })
+    upstream = await postKimi(translated, ctx)
   } catch (err) {
     if (err instanceof KimiError) {
-      log.warn("kimi error", { reqId: ctx.reqId, status: err.status, detail: err.detail })
+      log.warn("kimi error", { status: err.status, detail: err.detail })
       if (err.status === 429) {
         const headers: Record<string, string> = { "content-type": "application/json" }
         if (err.meta?.retryAfter) headers["retry-after"] = err.meta.retryAfter
@@ -115,8 +112,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
     const stream = translateStream(upstream.body, {
       messageId,
       model: body.model,
-      reqId: ctx.reqId,
-      sessionId: ctx.sessionId,
+      log: ctx.childLogger("kimi.stream"),
     })
     return new Response(stream, {
       status: 200,
@@ -129,14 +125,13 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
   }
 
   try {
-    const result = await accumulateResponse(upstream.body, { messageId, model: body.model })
+    const result = await accumulateResponse(upstream.body, { messageId, model: body.model, log: ctx.childLogger("kimi.accumulate") })
     return new Response(JSON.stringify(result.response), {
       headers: { "content-type": "application/json" },
     })
   } catch (err) {
     if (err instanceof UpstreamStreamError) {
       log.warn("upstream stream error (non-streaming)", {
-        reqId: ctx.reqId,
         kind: err.kind,
         message: err.message,
       })

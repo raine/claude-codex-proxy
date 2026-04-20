@@ -1,15 +1,9 @@
 import { API_BASE_URL } from "./auth/constants.ts"
 import { commonHeaders } from "./auth/headers.ts"
 import { forceRefresh, getAuth, KimiAuthUnauthorizedError } from "./auth/manager.ts"
-import { createLogger } from "../../log.ts"
+import type { Logger } from "../../log.ts"
+import type { RequestContext } from "../types.ts"
 import type { KimiChatRequest } from "./translate/request.ts"
-
-const log = createLogger("kimi.client")
-
-export interface KimiPostOptions {
-  sessionId?: string
-  signal?: AbortSignal
-}
 
 export interface KimiResponse {
   body: ReadableStream<Uint8Array>
@@ -31,16 +25,17 @@ export class KimiError extends Error {
 
 export async function postKimi(
   body: KimiChatRequest,
-  opts: KimiPostOptions = {},
+  ctx: RequestContext,
 ): Promise<KimiResponse> {
+  const log = ctx.childLogger("kimi.client")
   let auth = await getAuth()
-  let resp = await doFetch(auth.access, body, opts)
+  let resp = await doFetch(auth.access, body, log, ctx.signal)
 
   if (resp.status === 401) {
     log.warn("got 401, refreshing token", {})
     try {
       auth = await forceRefresh()
-      resp = await doFetch(auth.access, body, opts)
+      resp = await doFetch(auth.access, body, log, ctx.signal)
     } catch (err) {
       if (err instanceof KimiAuthUnauthorizedError) {
         throw new KimiError(401, "Unauthorized", err.message)
@@ -69,7 +64,8 @@ export async function postKimi(
 async function doFetch(
   accessToken: string,
   body: KimiChatRequest,
-  opts: KimiPostOptions,
+  log: Logger,
+  signal?: AbortSignal,
 ): Promise<Response> {
   const fp = await commonHeaders()
   const headers = new Headers({
@@ -84,14 +80,13 @@ async function doFetch(
     model: body.model,
     messageCount: body.messages.length,
     toolCount: body.tools?.length ?? 0,
-    sessionId: opts.sessionId,
   })
 
   return fetch(`${API_BASE_URL}/chat/completions`, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    signal: opts.signal,
+    signal,
   })
 }
 

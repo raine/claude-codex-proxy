@@ -1,7 +1,6 @@
 import { parseSseStream } from "../../../sse.ts"
-import { createLogger } from "../../../log.ts"
+import type { Logger } from "../../../log.ts"
 
-const log = createLogger("kimi.reducer")
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
 export class UpstreamStreamError extends Error {
@@ -70,6 +69,7 @@ interface ToolSlot {
  */
 export async function* reduceUpstream(
   upstream: ReadableStream<Uint8Array>,
+  log: Logger,
 ): AsyncGenerator<ReducerEvent> {
   let nextBlockIndex = 0
   let thinkingIndex: number | undefined

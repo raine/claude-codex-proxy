@@ -1,14 +1,8 @@
 import { CODEX_API_ENDPOINT, ORIGINATOR } from "./auth/constants.ts"
 import { forceRefresh, getAuth } from "./auth/manager.ts"
-import { createLogger } from "../../log.ts"
+import type { Logger } from "../../log.ts"
+import type { RequestContext } from "../types.ts"
 import type { ResponsesRequest } from "./translate/request.ts"
-
-const log = createLogger("codex.client")
-
-export interface CodexPostOptions {
-  sessionId?: string
-  signal?: AbortSignal
-}
 
 export interface CodexResponse {
   body: ReadableStream<Uint8Array>
@@ -18,16 +12,17 @@ export interface CodexResponse {
 
 export async function postCodex(
   body: ResponsesRequest,
-  opts: CodexPostOptions = {},
+  ctx: RequestContext,
 ): Promise<CodexResponse> {
+  const log = ctx.childLogger("codex.client")
   let auth = await getAuth()
-  let resp = await doFetch(auth.access, auth.accountId, body, opts)
+  let resp = await doFetch(auth.access, auth.accountId, body, log, ctx.signal, ctx.sessionId)
 
   if (resp.status === 401) {
     log.warn("got 401, refreshing token", {})
     try {
       auth = await forceRefresh()
-      resp = await doFetch(auth.access, auth.accountId, body, opts)
+      resp = await doFetch(auth.access, auth.accountId, body, log, ctx.signal, ctx.sessionId)
     } catch (err) {
       log.error("refresh after 401 failed", { err: String(err) })
     }
@@ -59,7 +54,9 @@ async function doFetch(
   accessToken: string,
   accountId: string | undefined,
   body: ResponsesRequest,
-  opts: CodexPostOptions,
+  log: Logger,
+  signal?: AbortSignal,
+  sessionId?: string,
 ): Promise<Response> {
   const headers = new Headers({
     "Content-Type": "application/json",
@@ -69,10 +66,10 @@ async function doFetch(
     "openai-beta": "responses=experimental",
   })
   if (accountId) headers.set("ChatGPT-Account-Id", accountId)
-  if (opts.sessionId) {
-    headers.set("session_id", opts.sessionId)
-    headers.set("x-client-request-id", opts.sessionId)
-    headers.set("x-codex-window-id", `${opts.sessionId}:0`)
+  if (sessionId) {
+    headers.set("session_id", sessionId)
+    headers.set("x-client-request-id", sessionId)
+    headers.set("x-codex-window-id", `${sessionId}:0`)
   }
 
   log.debug("posting to codex", {
@@ -80,14 +77,13 @@ async function doFetch(
     model: body.model,
     inputCount: body.input.length,
     toolCount: body.tools?.length ?? 0,
-    sessionId: opts.sessionId,
   })
 
   return fetch(CODEX_API_ENDPOINT, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
-    signal: opts.signal,
+    signal,
   })
 }
 

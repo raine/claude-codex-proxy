@@ -1,9 +1,10 @@
 import { createLogger, logDir } from "./log.ts"
+
 import type { AnthropicRequest } from "./anthropic/schema.ts"
 import type { Provider, RequestContext } from "./providers/types.ts"
 import { allSupportedModels, providerForModel } from "./providers/registry.ts"
 
-const log = createLogger("server")
+const rootLog = createLogger("server")
 
 export interface ServeOptions {
   port: number
@@ -27,7 +28,7 @@ export function startServer(opts: ServeOptions): { stop: () => void; port: numbe
       const url = new URL(req.url)
       const start = Date.now()
       const reqId = crypto.randomUUID()
-      log.info("request", {
+      rootLog.info("request", {
         reqId,
         method: req.method,
         path: url.pathname,
@@ -35,15 +36,15 @@ export function startServer(opts: ServeOptions): { stop: () => void; port: numbe
       })
       try {
         const resp = await route(req, url, reqId)
-        log.info("response", { reqId, status: resp.status, ms: Date.now() - start })
+        rootLog.info("response", { reqId, status: resp.status, ms: Date.now() - start })
         return resp
       } catch (err) {
-        log.error("handler error", { reqId, err: String(err), stack: (err as Error)?.stack })
+        rootLog.error("handler error", { reqId, err: String(err), stack: (err as Error)?.stack })
         return jsonError(500, "internal_error", String(err))
       }
     },
   })
-  log.info("server listening", { port: server.port, logDir: logDir() })
+  rootLog.info("server listening", { port: server.port, logDir: logDir() })
   return {
     port: Number(server.port),
     stop: () => server.stop(),
@@ -62,8 +63,8 @@ async function route(req: Request, url: URL, reqId: string): Promise<Response> {
     if (body instanceof Response) return body
     const provider = routeProvider(body, reqId)
     if (provider instanceof Response) return provider
-    const ctx = buildCtx(req, reqId)
-    log.info("dispatch", { reqId, provider: provider.name, model: body.model })
+    const ctx = buildCtx(req, reqId, provider.name)
+    ctx.childLogger("server").info("dispatch", { model: body.model })
     return provider.handleCountTokens(body, ctx)
   }
 
@@ -72,21 +73,24 @@ async function route(req: Request, url: URL, reqId: string): Promise<Response> {
     if (body instanceof Response) return body
     const provider = routeProvider(body, reqId)
     if (provider instanceof Response) return provider
-    const ctx = buildCtx(req, reqId)
-    log.info("dispatch", { reqId, provider: provider.name, model: body.model })
+    const ctx = buildCtx(req, reqId, provider.name)
+    ctx.childLogger("server").info("dispatch", { model: body.model })
     return provider.handleMessages(body, ctx)
   }
 
   return jsonError(404, "not_found", `No route for ${req.method} ${url.pathname}`)
 }
 
-function buildCtx(req: Request, reqId: string): RequestContext {
+function buildCtx(req: Request, reqId: string, providerName: string): RequestContext {
   const sessionId = req.headers.get("x-claude-code-session-id") || undefined
+  const sessionSeq = nextSessionSeq(sessionId)
+  const bindings = { reqId, sessionId, sessionSeq, provider: providerName }
   return {
     reqId,
     sessionId,
-    sessionSeq: nextSessionSeq(sessionId),
+    sessionSeq,
     signal: req.signal,
+    childLogger: (service) => createLogger(service, bindings),
   }
 }
 
@@ -100,7 +104,7 @@ function routeProvider(body: AnthropicRequest, reqId: string): Provider | Respon
   }
   const provider = providerForModel(body.model)
   if (!provider) {
-    log.warn("unknown model", { reqId, model: body.model })
+    rootLog.warn("unknown model", { reqId, model: body.model })
     return jsonError(
       400,
       "invalid_request_error",

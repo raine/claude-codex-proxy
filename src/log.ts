@@ -112,13 +112,20 @@ export interface Logger {
   info(msg: string, fields?: Record<string, unknown>): void
   warn(msg: string, fields?: Record<string, unknown>): void
   error(msg: string, fields?: Record<string, unknown>): void
+  child(bindings: Record<string, unknown>): Logger
 }
 
-export function createLogger(service: string): Logger {
+export function createLogger(
+  service: string,
+  baseFields: Record<string, unknown> = {},
+): Logger {
+  const merge = (f?: Record<string, unknown>) =>
+    f ? { ...baseFields, ...f } : baseFields
   return {
-    debug: (msg, fields) => void write("debug", service, msg, fields),
-    info: (msg, fields) => void write("info", service, msg, fields),
-    warn: (msg, fields) => void write("warn", service, msg, fields),
-    error: (msg, fields) => void write("error", service, msg, fields),
+    debug: (msg, fields) => void write("debug", service, msg, merge(fields)),
+    info: (msg, fields) => void write("info", service, msg, merge(fields)),
+    warn: (msg, fields) => void write("warn", service, msg, merge(fields)),
+    error: (msg, fields) => void write("error", service, msg, merge(fields)),
+    child: (bindings) => createLogger(service, { ...baseFields, ...bindings }),
   }
 }

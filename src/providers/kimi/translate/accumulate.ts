@@ -28,9 +28,11 @@ export interface AccumulatedResponse {
   rawUsage?: KimiUsage
 }
 
+import type { Logger } from "../../../log.ts"
+
 export async function accumulateResponse(
   upstream: ReadableStream<Uint8Array>,
-  opts: { messageId: string; model: string },
+  opts: { messageId: string; model: string; log: Logger },
 ): Promise<AccumulatedResponse> {
   type Block =
     | { kind: "thinking"; text: string }
@@ -43,7 +45,7 @@ export async function accumulateResponse(
   let usage: ReturnType<typeof mapUsageToAnthropic> | undefined
   let rawUsage: KimiUsage | undefined
 
-  for await (const e of reduceUpstream(upstream)) {
+  for await (const e of reduceUpstream(upstream, opts.log)) {
     switch (e.kind) {
       case "thinking-start":
         blocks.set(e.index, { kind: "thinking", text: "" })

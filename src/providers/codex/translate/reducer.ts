@@ -1,7 +1,6 @@
 import { parseSseStream } from "../../../sse.ts"
-import { createLogger } from "../../../log.ts"
+import type { Logger } from "../../../log.ts"
 
-const log = createLogger("translate.reducer")
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
 export class UpstreamStreamError extends Error {
@@ -79,6 +78,7 @@ function sanitizeToolArgs(name: string, args: string): string {
  */
 export async function* reduceUpstream(
   upstream: ReadableStream<Uint8Array>,
+  log: Logger,
 ): AsyncGenerator<ReducerEvent> {
   const blocksByOutputIndex = new Map<number, BlockState>()
   const itemIdToOutputIndex = new Map<string, number>()

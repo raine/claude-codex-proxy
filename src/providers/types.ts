@@ -1,10 +1,13 @@
 import type { AnthropicRequest } from "../anthropic/schema.ts"
 
+import type { Logger } from "../log.ts"
+
 export interface RequestContext {
   reqId: string
   sessionId?: string
   sessionSeq?: number
   signal: AbortSignal
+  childLogger(service: string): Logger
 }
 
 export interface CliHandlers {

@@ -1,8 +1,6 @@
 import { encodeSseEvent } from "../../../sse.ts"
-import { createLogger } from "../../../log.ts"
+import type { Logger } from "../../../log.ts"
 import { mapUsageToAnthropic, reduceUpstream, UpstreamStreamError } from "./reducer.ts"
-
-const log = createLogger("translate.stream")
 
 /**
  * Translate a Codex Responses SSE stream into Anthropic SSE events.
@@ -17,8 +15,7 @@ export function translateStream(
   opts: {
     messageId: string
     model: string
-    reqId: string
-    sessionId?: string
+    log: Logger
     onFinish?: (finish: { stopReason: "end_turn" | "tool_use" | "max_tokens"; usage?: Parameters<typeof mapUsageToAnthropic>[0] }) => void
   },
 ): ReadableStream<Uint8Array> {
@@ -55,7 +52,7 @@ export function translateStream(
       }
 
       try {
-        for await (const e of reduceUpstream(upstream)) {
+        for await (const e of reduceUpstream(upstream, opts.log)) {
           switch (e.kind) {
             case "text-start":
               ensureMessageStart()
@@ -116,9 +113,7 @@ export function translateStream(
         const activeToolNames = Array.from(activeTools.values(), (tool) => tool.name)
         const activeToolCalls = Array.from(activeTools.values())
         if (err instanceof UpstreamStreamError) {
-          log.warn("upstream stream error", {
-            reqId: opts.reqId,
-            sessionId: opts.sessionId,
+          opts.log.warn("upstream stream error", {
             kind: err.kind,
             message: err.message,
             activeToolNames,
@@ -133,9 +128,7 @@ export function translateStream(
             },
           })
         } else {
-          log.error("stream translation error", {
-            reqId: opts.reqId,
-            sessionId: opts.sessionId,
+          opts.log.error("stream translation error", {
             err: String(err),
             activeToolNames,
             activeToolCalls,
