@@ -167,6 +167,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
   const wantStream = body.stream !== false
   const messageCount = body.messages?.length ?? 0
   const toolCount = body.tools?.length ?? 0
+  const contextManagement = body.context_management
 
   log.debug("anthropic request", {
     reqId,
@@ -176,7 +177,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
     stream: wantStream,
     sessionId,
     requestedMaxTokens: body.max_tokens,
-    hasContextManagement: body.context_management !== undefined,
+    hasContextManagement: contextManagement !== undefined,
     hasJsonSchemaFormat: body.output_config?.format?.type === "json_schema",
   })
   if (VERBOSE) log.debug("anthropic request body", { reqId, body })
@@ -218,7 +219,7 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
     hasInstructions: !!translated.instructions,
     requestedMaxTokens: body.max_tokens,
     translatedMaxOutputTokens: translated.max_output_tokens,
-    hasContextManagement: body.context_management !== undefined,
+    hasContextManagement: contextManagement !== undefined,
     promptCacheKey: translated.prompt_cache_key,
   })
   if (VERBOSE) log.debug("translated request body", { reqId, body: translated })
@@ -239,7 +240,8 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
       hasInstructions: !!translated.instructions,
       requestedMaxTokens: body.max_tokens,
       translatedMaxOutputTokens: translated.max_output_tokens,
-      hasContextManagement: body.context_management !== undefined,
+      hasContextManagement: contextManagement !== undefined,
+      contextManagement,
       previousCountReqId: state?.lastCount?.reqId,
       previousCountModel: state?.lastCount?.model,
       previousCountTokens: state?.lastCount?.tokens,
@@ -295,7 +297,8 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
               translatedInputTokens,
               requestedMaxTokens: body.max_tokens,
               translatedMaxOutputTokens: translated.max_output_tokens,
-              hasContextManagement: body.context_management !== undefined,
+              hasContextManagement: contextManagement !== undefined,
+              contextManagement,
               upstreamInputTokens: finish.usage?.input_tokens ?? 0,
               upstreamOutputTokens: finish.usage?.output_tokens ?? 0,
               upstreamCachedInputTokens: finish.usage?.input_tokens_details?.cached_tokens ?? 0,
@@ -337,7 +340,8 @@ async function handleMessages(req: Request, reqId: string): Promise<Response> {
         translatedInputTokens,
         requestedMaxTokens: body.max_tokens,
         translatedMaxOutputTokens: translated.max_output_tokens,
-        hasContextManagement: body.context_management !== undefined,
+        hasContextManagement: contextManagement !== undefined,
+        contextManagement,
         upstreamInputTokens: result.rawUsage?.input_tokens ?? 0,
         upstreamOutputTokens: result.rawUsage?.output_tokens ?? 0,
         upstreamCachedInputTokens: result.rawUsage?.input_tokens_details?.cached_tokens ?? 0,
