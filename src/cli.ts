@@ -31,6 +31,8 @@ async function main() {
     console.log(`  export ANTHROPIC_AUTH_TOKEN="anything"`)
     if (provider.name === "codex") {
       console.log(`  export ANTHROPIC_MODEL="gpt-5.4"`)
+    } else if (provider.name === "kimi") {
+      console.log(`  export ANTHROPIC_MODEL="kimi-for-coding"`)
     }
     console.log(`  export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"`)
     return

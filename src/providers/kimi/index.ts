@@ -1,19 +1,160 @@
 import type { Provider, CliHandlers, RequestContext } from "../types.ts"
 import type { AnthropicRequest } from "../../anthropic/schema.ts"
+import { createLogger } from "../../log.ts"
+import {
+  assertAllowedModel,
+  ModelNotAllowedError,
+  resolveModel,
+} from "./translate/model-allowlist.ts"
+import { translateRequest } from "./translate/request.ts"
+import { translateStream } from "./translate/stream.ts"
+import { accumulateResponse, UpstreamStreamError } from "./translate/accumulate.ts"
+import { countTokens, countTranslatedTokens } from "./count-tokens.ts"
+import { KimiError, postKimi } from "./client.ts"
 import { runDeviceLogin } from "./auth/login.ts"
 import { persistInitialTokens } from "./auth/manager.ts"
 import { loadAuth, clearAuth, authPath } from "./auth/token-store.ts"
 
-function notImplemented(_body: AnthropicRequest, _ctx: RequestContext): Promise<Response> {
-  return Promise.resolve(
-    new Response(
-      JSON.stringify({
-        type: "error",
-        error: { type: "api_error", message: "kimi provider: chat not implemented yet" },
-      }),
-      { status: 501, headers: { "content-type": "application/json" } },
-    ),
+const log = createLogger("provider.kimi")
+const VERBOSE = !!process.env.CCP_LOG_VERBOSE
+
+function jsonError(status: number, type: string, message: string): Response {
+  return new Response(JSON.stringify({ type: "error", error: { type, message } }), {
+    status,
+    headers: { "content-type": "application/json" },
+  })
+}
+
+async function handleCountTokens(body: AnthropicRequest, ctx: RequestContext): Promise<Response> {
+  const resolvedModel = resolveModel(body.model)
+  const translated = translateRequest({ ...body, model: resolvedModel })
+  const tokens = countTranslatedTokens(translated)
+  log.debug("count_tokens", { reqId: ctx.reqId, tokens })
+  return new Response(JSON.stringify({ input_tokens: tokens }), {
+    headers: { "content-type": "application/json" },
+  })
+}
+
+async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Promise<Response> {
+  const messageId = `msg_${crypto.randomUUID().replace(/-/g, "")}`
+  const wantStream = body.stream !== false
+  const messageCount = body.messages?.length ?? 0
+  const toolCount = body.tools?.length ?? 0
+
+  log.debug("anthropic request", {
+    reqId: ctx.reqId,
+    model: body.model,
+    messageCount,
+    toolCount,
+    stream: wantStream,
+    sessionId: ctx.sessionId,
+    requestedMaxTokens: body.max_tokens,
+  })
+  if (VERBOSE) log.debug("anthropic request body", { reqId: ctx.reqId, body })
+
+  const resolvedModel = resolveModel(body.model)
+  try {
+    assertAllowedModel(resolvedModel)
+  } catch (err) {
+    if (err instanceof ModelNotAllowedError) {
+      return jsonError(
+        400,
+        "invalid_request_error",
+        `Model "${body.model}" resolves to unsupported model "${err.model}"`,
+      )
+    }
+    throw err
+  }
+
+  const translated = translateRequest(
+    { ...body, model: resolvedModel },
+    { sessionId: ctx.sessionId },
   )
+  const localInputTokens = VERBOSE ? countTokens(body) : undefined
+  const translatedInputTokens = VERBOSE ? countTranslatedTokens(translated) : undefined
+  log.debug("translated request", {
+    reqId: ctx.reqId,
+    requestedModel: body.model,
+    resolvedModel,
+    messageCount: translated.messages.length,
+    toolCount: translated.tools?.length ?? 0,
+    localInputTokens,
+    translatedInputTokens,
+    promptCacheKey: translated.prompt_cache_key,
+    reasoningEffort: translated.reasoning_effort,
+    thinking: translated.thinking?.type,
+    maxTokens: translated.max_tokens,
+  })
+  if (VERBOSE) log.debug("translated request body", { reqId: ctx.reqId, body: translated })
+
+  let upstream
+  try {
+    upstream = await postKimi(translated, { sessionId: ctx.sessionId, signal: ctx.signal })
+  } catch (err) {
+    if (err instanceof KimiError) {
+      log.warn("kimi error", { reqId: ctx.reqId, status: err.status, detail: err.detail })
+      if (err.status === 429) {
+        const headers: Record<string, string> = { "content-type": "application/json" }
+        if (err.meta?.retryAfter) headers["retry-after"] = err.meta.retryAfter
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "rate_limit_error", message: err.detail || err.message },
+          }),
+          { status: 429, headers },
+        )
+      }
+      const type =
+        err.status === 401 || err.status === 403 ? "authentication_error" : "api_error"
+      return jsonError(err.status, type, err.detail || err.message)
+    }
+    throw err
+  }
+
+  if (wantStream) {
+    const stream = translateStream(upstream.body, {
+      messageId,
+      model: body.model,
+      reqId: ctx.reqId,
+      sessionId: ctx.sessionId,
+    })
+    return new Response(stream, {
+      status: 200,
+      headers: {
+        "content-type": "text/event-stream",
+        "cache-control": "no-cache",
+        connection: "keep-alive",
+      },
+    })
+  }
+
+  try {
+    const result = await accumulateResponse(upstream.body, { messageId, model: body.model })
+    return new Response(JSON.stringify(result.response), {
+      headers: { "content-type": "application/json" },
+    })
+  } catch (err) {
+    if (err instanceof UpstreamStreamError) {
+      log.warn("upstream stream error (non-streaming)", {
+        reqId: ctx.reqId,
+        kind: err.kind,
+        message: err.message,
+      })
+      if (err.kind === "rate_limit") {
+        const headers: Record<string, string> = { "content-type": "application/json" }
+        if (err.retryAfterSeconds) headers["retry-after"] = String(err.retryAfterSeconds)
+        return new Response(
+          JSON.stringify({
+            type: "error",
+            error: { type: "rate_limit_error", message: err.message },
+          }),
+          { status: 429, headers },
+        )
+      }
+      return jsonError(502, "api_error", err.message)
+    }
+    throw err
+  }
 }
 
 const cli: CliHandlers = {
@@ -45,7 +186,7 @@ const cli: CliHandlers = {
 
 export const kimiProvider: Provider = {
   name: "kimi",
-  handleMessages: notImplemented,
-  handleCountTokens: notImplemented,
+  handleMessages,
+  handleCountTokens,
   cli,
 }
