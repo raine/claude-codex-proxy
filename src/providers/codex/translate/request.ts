@@ -5,7 +5,7 @@ import type {
   AnthropicRequest,
   AnthropicTextBlock,
   AnthropicTool,
-} from "../anthropic/schema.ts"
+} from "../../../anthropic/schema.ts"
 
 // Keep this aligned to the upstream Codex ResponsesApiRequest field set.
 // Do not add plausible-looking top-level fields without source support or a confirmed live test.

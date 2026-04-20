@@ -1,5 +1,5 @@
-import { encodeSseEvent } from "./sse.ts"
-import { createLogger } from "../log.ts"
+import { encodeSseEvent } from "../../../sse.ts"
+import { createLogger } from "../../../log.ts"
 import { mapUsageToAnthropic, reduceUpstream, UpstreamStreamError } from "./reducer.ts"
 
 const log = createLogger("translate.stream")

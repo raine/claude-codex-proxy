@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test"
-import type { AnthropicRequest } from "../anthropic/schema.ts"
+import type { AnthropicRequest } from "../../../anthropic/schema.ts"
 import { translateRequest } from "./request.ts"
 
 const baseRequest: AnthropicRequest = {

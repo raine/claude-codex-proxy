@@ -1,5 +1,5 @@
-import { parseSseStream } from "./sse.ts"
-import { createLogger } from "../log.ts"
+import { parseSseStream } from "../../../sse.ts"
+import { createLogger } from "../../../log.ts"
 
 const log = createLogger("translate.reducer")
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE

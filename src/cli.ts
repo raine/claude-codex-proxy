@@ -1,10 +1,8 @@
 #!/usr/bin/env bun
-import { runBrowserLogin } from "./auth/pkce.ts"
-import { runDeviceLogin } from "./auth/device.ts"
-import { persistInitialTokens } from "./auth/manager.ts"
-import { loadAuth, authPath, clearAuth } from "./auth/token-store.ts"
 import { startServer } from "./server.ts"
 import { createLogger, logDir } from "./log.ts"
+import { getProvider, listProviders } from "./providers/registry.ts"
+import type { CliHandlers } from "./providers/types.ts"
 
 declare const BUILD_VERSION: string | undefined
 const VERSION = typeof BUILD_VERSION === "string" ? BUILD_VERSION : "dev"
@@ -12,74 +10,89 @@ const VERSION = typeof BUILD_VERSION === "string" ? BUILD_VERSION : "dev"
 const log = createLogger("cli")
 
 async function main() {
-  const [, , cmd, sub] = process.argv
-  if (cmd === "--version" || cmd === "-v" || cmd === "version") {
-    console.log(`claude-codex-proxy ${VERSION}`)
+  const args = process.argv.slice(2)
+  const [first, ...rest] = args
+
+  if (first === "--version" || first === "-v" || first === "version") {
+    console.log(`claude-code-proxy ${VERSION}`)
     return
   }
-  switch (cmd) {
-    case "serve":
-    case undefined: {
-      const port = Number(process.env.PORT ?? 18765)
-      startServer({ port })
-      console.log(`Proxy listening on http://localhost:${port}`)
-      console.log(`Logs: ${logDir()}/proxy.log`)
-      console.log()
-      console.log("Configure Claude Code:")
-      console.log(`  export ANTHROPIC_BASE_URL="http://localhost:${port}"`)
-      console.log(`  export ANTHROPIC_AUTH_TOKEN="anything"`)
+
+  if (!first || first === "serve") {
+    const providerName = argFlag(rest, "--provider") ?? process.env.CCP_PROVIDER ?? "codex"
+    const provider = getProvider(providerName)
+    const port = Number(process.env.PORT ?? 18765)
+    startServer({ port, provider })
+    console.log(`Proxy listening on http://localhost:${port} (provider: ${provider.name})`)
+    console.log(`Logs: ${logDir()}/proxy.log`)
+    console.log()
+    console.log("Configure Claude Code:")
+    console.log(`  export ANTHROPIC_BASE_URL="http://localhost:${port}"`)
+    console.log(`  export ANTHROPIC_AUTH_TOKEN="anything"`)
+    if (provider.name === "codex") {
       console.log(`  export ANTHROPIC_MODEL="gpt-5.4"`)
-      console.log(`  export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"`)
-      return
     }
-    case "auth": {
-      if (sub === "login") {
-        const tokens = await runBrowserLogin()
-        const saved = await persistInitialTokens(tokens)
-        console.log(`Auth saved in ${authPath()}`)
-        if (saved.accountId) console.log(`Account: ${saved.accountId}`)
-        process.exit(0)
+    console.log(`  export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"`)
+    return
+  }
+
+  if (listProviders().includes(first)) {
+    const provider = getProvider(first)
+    await runProviderCommand(provider.name, provider.cli, rest)
+    return
+  }
+
+  usageAndExit()
+}
+
+async function runProviderCommand(name: string, cli: CliHandlers, args: string[]): Promise<void> {
+  const [group, sub] = args
+  if (group !== "auth") usageAndExit()
+
+  switch (sub) {
+    case "login":
+      if (!cli.login) {
+        console.error(`${name}: browser login not supported`)
+        process.exit(2)
       }
-      if (sub === "device") {
-        const tokens = await runDeviceLogin()
-        const saved = await persistInitialTokens(tokens)
-        console.log(`Auth saved in ${authPath()}`)
-        if (saved.accountId) console.log(`Account: ${saved.accountId}`)
-        process.exit(0)
+      await cli.login()
+      process.exit(0)
+    case "device":
+      if (!cli.device) {
+        console.error(`${name}: device login not supported`)
+        process.exit(2)
       }
-      if (sub === "status") {
-        const auth = await loadAuth()
-        if (!auth) {
-          console.log("Not authenticated")
-          process.exit(1)
-        }
-        const ms = auth.expires - Date.now()
-        console.log(`Account: ${auth.accountId ?? "(none)"}`)
-        console.log(`Expires: ${new Date(auth.expires).toISOString()} (in ${Math.floor(ms / 1000)}s)`)
-        console.log(`Storage: ${authPath()}`)
-        return
-      }
-      if (sub === "logout") {
-        await clearAuth()
-        console.log("Logged out")
-        return
-      }
-      usageAndExit()
+      await cli.device()
+      process.exit(0)
+    case "status":
+      await cli.status()
       return
-    }
+    case "logout":
+      await cli.logout()
+      return
     default:
       usageAndExit()
   }
 }
 
+function argFlag(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag)
+  if (i === -1) return undefined
+  return args[i + 1]
+}
+
 function usageAndExit(): never {
+  const providers = listProviders().join("|")
   console.log(`Usage:
-  claude-codex-proxy serve              Run proxy (PORT env, default 18765)
-  claude-codex-proxy auth login         Browser OAuth (PKCE)
-  claude-codex-proxy auth device        Device-code OAuth
-  claude-codex-proxy auth status        Show current auth
-  claude-codex-proxy auth logout        Clear stored auth
-  claude-codex-proxy --version          Show version
+  claude-code-proxy serve [--provider ${providers}]    Run proxy (PORT env, default 18765)
+  claude-code-proxy <provider> auth login              Browser OAuth
+  claude-code-proxy <provider> auth device             Device-code OAuth
+  claude-code-proxy <provider> auth status             Show current auth
+  claude-code-proxy <provider> auth logout             Clear stored auth
+  claude-code-proxy --version                          Show version
+
+Providers: ${providers}
+Default provider: ${process.env.CCP_PROVIDER ?? "codex"} (override with CCP_PROVIDER or --provider)
 `)
   process.exit(2)
 }

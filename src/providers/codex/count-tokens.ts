@@ -1,5 +1,5 @@
 import { encode } from "gpt-tokenizer/model/gpt-4o"
-import type { AnthropicRequest } from "./anthropic/schema.ts"
+import type { AnthropicRequest } from "../../anthropic/schema.ts"
 import type { ResponsesRequest } from "./translate/request.ts"
 import { buildInstructions, normalizeContent, toolResultToString } from "./translate/request.ts"
 

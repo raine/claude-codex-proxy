@@ -8,7 +8,7 @@ permissions:
   contents: write
 
 env:
-  BIN_NAME: claude-codex-proxy
+  BIN_NAME: claude-code-proxy
 
 jobs:
   build:
@@ -80,7 +80,7 @@ jobs:
           merge-multiple: true
       - uses: actions/checkout@v5
         with:
-          repository: raine/homebrew-claude-codex-proxy
+          repository: raine/homebrew-claude-code-proxy
           token: ${{ secrets.RELEASE_TOKEN }}
           path: tap
       - name: Generate formula and push to tap
@@ -88,54 +88,54 @@ jobs:
           VERSION: ${{ github.ref_name }}
         run: |
           VERSION="${VERSION#v}"
-          SHA_ARM=$(awk '{print $1}' claude-codex-proxy-darwin-arm64.sha256)
-          SHA_INTEL=$(awk '{print $1}' claude-codex-proxy-darwin-amd64.sha256)
-          SHA_LINUX_AMD=$(awk '{print $1}' claude-codex-proxy-linux-amd64.sha256)
-          SHA_LINUX_ARM=$(awk '{print $1}' claude-codex-proxy-linux-arm64.sha256)
+          SHA_ARM=$(awk '{print $1}' claude-code-proxy-darwin-arm64.sha256)
+          SHA_INTEL=$(awk '{print $1}' claude-code-proxy-darwin-amd64.sha256)
+          SHA_LINUX_AMD=$(awk '{print $1}' claude-code-proxy-linux-amd64.sha256)
+          SHA_LINUX_ARM=$(awk '{print $1}' claude-code-proxy-linux-arm64.sha256)
 
           mkdir -p tap/Formula
-          cat > tap/Formula/claude-codex-proxy.rb << EOF
-          class ClaudeCodexProxy < Formula
+          cat > tap/Formula/claude-code-proxy.rb << EOF
+          class ClaudeCodeProxy < Formula
             desc "Local proxy: Claude Code to ChatGPT subscription via Codex Responses API"
-            homepage "https://github.com/raine/claude-codex-proxy"
+            homepage "https://github.com/raine/claude-code-proxy"
             version "${VERSION}"
             license "MIT"
 
             on_macos do
               if Hardware::CPU.arm?
-                url "https://github.com/raine/claude-codex-proxy/releases/download/v${VERSION}/claude-codex-proxy-darwin-arm64.tar.gz"
+                url "https://github.com/raine/claude-code-proxy/releases/download/v${VERSION}/claude-code-proxy-darwin-arm64.tar.gz"
                 sha256 "${SHA_ARM}"
               else
-                url "https://github.com/raine/claude-codex-proxy/releases/download/v${VERSION}/claude-codex-proxy-darwin-amd64.tar.gz"
+                url "https://github.com/raine/claude-code-proxy/releases/download/v${VERSION}/claude-code-proxy-darwin-amd64.tar.gz"
                 sha256 "${SHA_INTEL}"
               end
             end
 
             on_linux do
               if Hardware::CPU.arm?
-                url "https://github.com/raine/claude-codex-proxy/releases/download/v${VERSION}/claude-codex-proxy-linux-arm64.tar.gz"
+                url "https://github.com/raine/claude-code-proxy/releases/download/v${VERSION}/claude-code-proxy-linux-arm64.tar.gz"
                 sha256 "${SHA_LINUX_ARM}"
               else
-                url "https://github.com/raine/claude-codex-proxy/releases/download/v${VERSION}/claude-codex-proxy-linux-amd64.tar.gz"
+                url "https://github.com/raine/claude-code-proxy/releases/download/v${VERSION}/claude-code-proxy-linux-amd64.tar.gz"
                 sha256 "${SHA_LINUX_AMD}"
               end
             end
 
             def install
-              bin.install "claude-codex-proxy"
+              bin.install "claude-code-proxy"
             end
 
             test do
-              assert_match version.to_s, shell_output("\#{bin}/claude-codex-proxy --version")
+              assert_match version.to_s, shell_output("\#{bin}/claude-code-proxy --version")
             end
           end
           EOF
-          sed -i 's/^          //' tap/Formula/claude-codex-proxy.rb
+          sed -i 's/^          //' tap/Formula/claude-code-proxy.rb
 
           cd tap
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/claude-codex-proxy.rb
-          git commit -m "claude-codex-proxy ${VERSION}"
+          git add Formula/claude-code-proxy.rb
+          git commit -m "claude-code-proxy ${VERSION}"
           git pull --rebase
           git push

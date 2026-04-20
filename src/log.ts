@@ -21,7 +21,7 @@ const REDACT_KEYS = new Set([
 
 function stateDir(): string {
   const base = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state")
-  return join(base, "claude-codex-proxy")
+  return join(base, "claude-code-proxy")
 }
 
 export function logDir(): string {

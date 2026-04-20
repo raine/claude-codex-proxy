@@ -1,21 +1,21 @@
 #!/usr/bin/env bash
 #
-# claude-codex-proxy installation script
-# Usage: curl -fsSL https://raw.githubusercontent.com/raine/claude-codex-proxy/main/scripts/install.sh | bash
+# claude-code-proxy installation script
+# Usage: curl -fsSL https://raw.githubusercontent.com/raine/claude-code-proxy/main/scripts/install.sh | bash
 #
 # Environment variables:
-#   CLAUDE_CODEX_PROXY_VERSION      - Pin a specific version (e.g., v0.1.0)
-#   CLAUDE_CODEX_PROXY_INSTALL_DIR  - Override install directory (default: /usr/local/bin or ~/.local/bin)
+#   CLAUDE_CODE_PROXY_VERSION      - Pin a specific version (e.g., v0.1.0)
+#   CLAUDE_CODE_PROXY_INSTALL_DIR  - Override install directory (default: /usr/local/bin or ~/.local/bin)
 #
 # Examples:
-#   CLAUDE_CODEX_PROXY_VERSION=v0.1.0 bash install.sh
-#   CLAUDE_CODEX_PROXY_INSTALL_DIR=/opt/bin bash install.sh
+#   CLAUDE_CODE_PROXY_VERSION=v0.1.0 bash install.sh
+#   CLAUDE_CODE_PROXY_INSTALL_DIR=/opt/bin bash install.sh
 #
 
 set -e
 
-BIN_NAME="claude-codex-proxy"
-REPO="raine/claude-codex-proxy"
+BIN_NAME="claude-code-proxy"
+REPO="raine/claude-code-proxy"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -70,7 +70,7 @@ install_from_release() {
 	tmp_dir=$(mktemp -d)
 	trap 'rm -rf "$tmp_dir"' EXIT
 
-	local version="${CLAUDE_CODEX_PROXY_VERSION:-}"
+	local version="${CLAUDE_CODE_PROXY_VERSION:-}"
 
 	if [ -z "$version" ]; then
 		log_info "Fetching latest release..."
@@ -93,7 +93,7 @@ install_from_release() {
 			echo ""
 			echo "This might be due to network issues or GitHub API rate limits."
 			echo "You can specify a version manually:"
-			echo "  CLAUDE_CODEX_PROXY_VERSION=v0.1.0 bash install.sh"
+			echo "  CLAUDE_CODE_PROXY_VERSION=v0.1.0 bash install.sh"
 			echo ""
 			exit 1
 		fi
@@ -166,7 +166,7 @@ install_from_release() {
 		exit 1
 	fi
 
-	local install_dir="${CLAUDE_CODEX_PROXY_INSTALL_DIR:-}"
+	local install_dir="${CLAUDE_CODE_PROXY_INSTALL_DIR:-}"
 	if [ -z "$install_dir" ]; then
 		if [[ -w /usr/local/bin ]]; then
 			install_dir="/usr/local/bin"
@@ -243,7 +243,7 @@ verify_installation() {
 	echo ""
 
 	echo "Get started:"
-	echo "  ${BIN_NAME} auth login    # authenticate with your ChatGPT account"
+	echo "  ${BIN_NAME} codex auth login    # authenticate with your ChatGPT account"
 	echo "  ${BIN_NAME} serve         # start the proxy"
 	echo ""
 	echo "Documentation: https://github.com/${REPO}"

@@ -1,7 +1,7 @@
-import { CODEX_API_ENDPOINT, ORIGINATOR } from "../auth/constants.ts"
-import { forceRefresh, getAuth } from "../auth/manager.ts"
-import { createLogger } from "../log.ts"
-import type { ResponsesRequest } from "../translate/request.ts"
+import { CODEX_API_ENDPOINT, ORIGINATOR } from "./auth/constants.ts"
+import { forceRefresh, getAuth } from "./auth/manager.ts"
+import { createLogger } from "../../log.ts"
+import type { ResponsesRequest } from "./translate/request.ts"
 
 const log = createLogger("codex.client")
 

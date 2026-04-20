@@ -1,10 +1,10 @@
-# claude-codex-proxy
+# claude-code-proxy
 
-`claude-codex-proxy` lets you use
+`claude-code-proxy` lets you use
 [Claude Code](https://www.anthropic.com/claude-code) with your ChatGPT Plus or
 Pro subscription.
 
-<img src="meta/claude-code-screenshot.webp" alt="Claude Code running through claude-codex-proxy" width="630" />
+<img src="meta/claude-code-screenshot.webp" alt="Claude Code running through claude-code-proxy" width="630" />
 
 [Quick start](#quick-start) · [How it works](#how-it-works) ·
 [Configuration](#configuration) · [Limitations](#limitations)
@@ -27,30 +27,30 @@ ended up forking it and applying some patches, but would much rather not do it.
 **Homebrew** (macOS and Linux):
 
 ```sh
-brew install raine/claude-codex-proxy/claude-codex-proxy
+brew install raine/claude-code-proxy/claude-code-proxy
 ```
 
 **Install script** (macOS and Linux):
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/raine/claude-codex-proxy/main/scripts/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/raine/claude-code-proxy/main/scripts/install.sh | bash
 ```
 
 **Manual:** download a prebuilt binary for your platform from the
-[releases page](https://github.com/raine/claude-codex-proxy/releases).
+[releases page](https://github.com/raine/claude-code-proxy/releases).
 
 ### 2. Authenticate with ChatGPT
 
 Open a browser (PKCE flow):
 
 ```sh
-claude-codex-proxy auth login
+claude-code-proxy codex auth login
 ```
 
 Or, on a headless machine (device code flow):
 
 ```sh
-claude-codex-proxy auth device
+claude-code-proxy codex auth device
 ```
 
 Either command prints a URL. Sign in with your **ChatGPT Plus/Pro account**. On
@@ -60,17 +60,17 @@ locally for reuse by the proxy.
 Verify it stuck:
 
 ```sh
-claude-codex-proxy auth status
+claude-code-proxy codex auth status
 ```
 
 ### 3. Start the proxy
 
 ```sh
-claude-codex-proxy serve
+claude-code-proxy serve
 ```
 
 Defaults to `http://127.0.0.1:18765` (loopback only). Override with
-`PORT=11435 claude-codex-proxy serve`.
+`PORT=11435 claude-code-proxy serve`.
 
 ### 4. Point Claude Code at it
 
@@ -178,7 +178,7 @@ and the proxy will send `gpt-5.4-mini` upstream.
 sequenceDiagram
     autonumber
     participant CC as Claude Code
-    participant P as claude-codex-proxy
+    participant P as claude-code-proxy
     participant AUTH as auth.openai.com
     participant CGX as chatgpt.com/<br/>backend-api/codex
 
@@ -192,7 +192,7 @@ sequenceDiagram
     end
 
     P->>P: translate request<br/>• strip max_tokens / temperature / cache_control<br/>• system blocks → top-level "instructions"<br/>• tool_use.id = call_id (identity)<br/>• prompt_cache_key = session id
-    P->>CGX: POST /responses<br/>Bearer + ChatGPT-Account-Id + originator=claude-codex-proxy
+    P->>CGX: POST /responses<br/>Bearer + ChatGPT-Account-Id + originator=claude-code-proxy
     CGX-->>P: Responses API SSE<br/>(output_item.*, output_text.delta, function_call_arguments.*, codex.rate_limits, response.completed)
     P->>P: reducer: typed events<br/>(text/tool start/delta/stop, finish)
     P-->>CC: Anthropic SSE<br/>(message_start, content_block_*, message_delta, message_stop)
@@ -200,35 +200,37 @@ sequenceDiagram
 
 ## Commands
 
-| Command                       | Description                               |
-| ----------------------------- | ----------------------------------------- |
-| [`serve`](#serve)             | Start the proxy on `PORT` (default 18765) |
-| [`auth login`](#auth-login)   | Browser OAuth (PKCE)                      |
-| [`auth device`](#auth-device) | Device-code OAuth (headless)              |
-| [`auth status`](#auth-status) | Show account ID and token expiry          |
-| [`auth logout`](#auth-logout) | Delete stored auth credentials            |
+| Command                             | Description                               |
+| ----------------------------------- | ----------------------------------------- |
+| [`serve`](#serve)                   | Start the proxy on `PORT` (default 18765) |
+| [`codex auth login`](#auth-login)   | Browser OAuth (PKCE)                      |
+| [`codex auth device`](#auth-device) | Device-code OAuth (headless)              |
+| [`codex auth status`](#auth-status) | Show account ID and token expiry          |
+| [`codex auth logout`](#auth-logout) | Delete stored auth credentials            |
 
 ---
 
 ### `serve`
 
 Starts the HTTP proxy and blocks. Binds to `127.0.0.1` only. Logs to
-`$XDG_STATE_HOME/claude-codex-proxy/proxy.log` (rotated at 20 MiB). Set
+`$XDG_STATE_HOME/claude-code-proxy/proxy.log` (rotated at 20 MiB). Set
 `CCP_LOG_STDERR=1` to mirror log lines to stderr while running.
 
 ```sh
-claude-codex-proxy serve
-PORT=11435 claude-codex-proxy serve
-CCP_LOG_STDERR=1 claude-codex-proxy serve
+claude-code-proxy serve
+PORT=11435 claude-code-proxy serve
+CCP_LOG_STDERR=1 claude-code-proxy serve
 ```
 
 Prints the exact `ANTHROPIC_BASE_URL` / `ANTHROPIC_MODEL` env vars to export on
-startup. Refuses to start traffic until `auth login` (or `auth device`) has
-stored a token.
+startup. Refuses to start traffic until `codex auth login` (or `codex auth
+device`) has stored a token.
+
+Selects a provider with `CCP_PROVIDER` (default `codex`).
 
 ---
 
-### `auth login`
+### `codex auth login`
 
 Runs the PKCE browser flow against `auth.openai.com` using the Codex CLI's
 client ID. Prints a URL, opens a local callback listener on port 1455, waits for
@@ -237,7 +239,7 @@ in Keychain on macOS or locally on other platforms. The process exits
 automatically once the tokens are saved.
 
 ```sh
-claude-codex-proxy auth login
+claude-code-proxy codex auth login
 ```
 
 Sign in with your **ChatGPT Plus/Pro account**, not an OpenAI API account. The
@@ -246,27 +248,27 @@ token file includes the extracted `chatgpt_account_id` so the proxy can set the
 
 ---
 
-### `auth device`
+### `codex auth device`
 
 Same OAuth flow, but for headless machines. Prints a short user code and a URL;
 you enter the code from any browser on any other device, and the CLI polls
 `auth.openai.com` until you authorize, then stores the token.
 
 ```sh
-claude-codex-proxy auth device
+claude-code-proxy codex auth device
 ```
 
 Useful over SSH, inside a container, or on any host that can't open a browser.
 
 ---
 
-### `auth status`
+### `codex auth status`
 
 Shows whether credentials are stored, the account ID, and how long until the
 access token expires. Non-zero exit if no auth is present.
 
 ```sh
-claude-codex-proxy auth status
+claude-code-proxy codex auth status
 ```
 
 Example output:
@@ -283,16 +285,16 @@ calls.
 
 ---
 
-### `auth logout`
+### `codex auth logout`
 
 Removes stored auth credentials. On macOS this deletes the Keychain entry. No
 server call is needed; the refresh token just becomes dead.
 
 ```sh
-claude-codex-proxy auth logout
+claude-code-proxy codex auth logout
 ```
 
-Run `auth login` again to re-authenticate.
+Run `codex auth login` again to re-authenticate.
 
 ---
 
@@ -313,13 +315,14 @@ Settings are environment variables on the proxy process, not a config file.
 | Variable          | Default          | Purpose                                            |
 | ----------------- | ---------------- | -------------------------------------------------- |
 | `PORT`            | `18765`          | Proxy listen port                                  |
+| `CCP_PROVIDER`    | `codex`          | Upstream provider (`codex`)                        |
 | `XDG_STATE_HOME`  | `~/.local/state` | Base dir for `proxy.log`                           |
 | `CCP_LOG_STDERR`  | unset            | Also mirror log lines to stderr                    |
 | `CCP_LOG_VERBOSE` | unset            | Log full request/response bodies + every SSE event |
 
 ### Files
 
-- `$XDG_STATE_HOME/claude-codex-proxy/proxy.log`: JSON-lines log, rotated at 20
+- `$XDG_STATE_HOME/claude-code-proxy/proxy.log`: JSON-lines log, rotated at 20
   MiB. Secrets (`authorization`, `access`, `refresh`, `id_token`,
   `ChatGPT-Account-Id`, …) are redacted before write.
 
@@ -348,7 +351,7 @@ Settings are environment variables on the proxy process, not a config file.
 ```sh
 bunx tsc --noEmit     # typecheck
 bun src/cli.ts serve  # run locally
-tail -f ~/.local/state/claude-codex-proxy/proxy.log | jq .
+tail -f ~/.local/state/claude-code-proxy/proxy.log | jq .
 ```
 
 **Install a compiled dev build globally:** compile the current working tree to a
@@ -356,7 +359,7 @@ binary and place it on your `PATH` without linking:
 
 ```sh
 mkdir -p ~/.local/bin
-bun build ./src/cli.ts --compile --outfile ~/.local/bin/claude-codex-proxy
+bun build ./src/cli.ts --compile --outfile ~/.local/bin/claude-code-proxy
 ```
 
 ## Related projects
