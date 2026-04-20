@@ -7,6 +7,8 @@ import type {
   AnthropicTool,
 } from "../anthropic/schema.ts"
 
+// Keep this aligned to the upstream Codex ResponsesApiRequest field set.
+// Do not add plausible-looking top-level fields without source support or a confirmed live test.
 export interface ResponsesRequest {
   model: string
   instructions?: string
@@ -18,11 +20,12 @@ export interface ResponsesRequest {
     | "required"
     | { type: "function"; name: string }
   parallel_tool_calls?: boolean
+  reasoning?: { effort?: "low" | "medium" | "high"; summary?: unknown }
   store: false
   stream: true
   include?: string[]
+  service_tier?: string
   prompt_cache_key?: string
-  reasoning?: { effort?: "low" | "medium" | "high" }
   text?: {
     verbosity?: "low" | "medium" | "high"
     format?:
@@ -30,6 +33,7 @@ export interface ResponsesRequest {
       | { type: "json_object" }
       | { type: "json_schema"; name: string; schema: unknown; strict?: boolean }
   }
+  client_metadata?: Record<string, string>
 }
 
 export type ResponsesInputItem =

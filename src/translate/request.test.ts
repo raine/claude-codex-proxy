@@ -2,12 +2,12 @@ import { describe, expect, it } from "bun:test"
 import type { AnthropicRequest } from "../anthropic/schema.ts"
 import { translateRequest } from "./request.ts"
 
-describe("translateRequest", () => {
-  const baseRequest: AnthropicRequest = {
-    model: "claude-sonnet-4-6",
-    messages: [{ role: "user", content: "hello" }],
-  }
+const baseRequest: AnthropicRequest = {
+  model: "claude-sonnet-4-6",
+  messages: [{ role: "user", content: "hello" }],
+}
 
+describe("translateRequest", () => {
   it("omits reasoning include when reasoning is not enabled", () => {
     const translated = translateRequest(baseRequest)
 
@@ -23,5 +23,50 @@ describe("translateRequest", () => {
 
     expect(translated.reasoning).toEqual({ effort: "medium" })
     expect(translated.include).toEqual(["reasoning.encrypted_content"])
+  })
+
+  it("returns only the expected top-level upstream request fields", () => {
+    const translated = translateRequest({
+      ...baseRequest,
+      system: "follow instructions",
+      tools: [
+        {
+          name: "lookup_weather",
+          description: "Look up the weather",
+          input_schema: {
+            type: "object",
+            properties: { city: { type: "string" } },
+            required: ["city"],
+          },
+        },
+      ],
+      tool_choice: { type: "tool", name: "lookup_weather" },
+      output_config: {
+        effort: "high",
+        format: {
+          type: "json_schema",
+          name: "weather_response",
+          schema: {
+            type: "object",
+            properties: { forecast: { type: "string" } },
+            required: ["forecast"],
+          },
+        },
+      },
+    })
+
+    expect(Object.keys(translated).sort()).toEqual([
+      "include",
+      "input",
+      "instructions",
+      "model",
+      "parallel_tool_calls",
+      "reasoning",
+      "store",
+      "stream",
+      "text",
+      "tool_choice",
+      "tools",
+    ])
   })
 })
