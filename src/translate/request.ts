@@ -12,7 +12,6 @@ export interface ResponsesRequest {
   instructions?: string
   input: ResponsesInputItem[]
   tools?: ResponsesTool[]
-  max_output_tokens?: number
   tool_choice?:
     | "auto"
     | "none"
@@ -96,7 +95,6 @@ export function translateRequest(req: AnthropicRequest, opts: TranslateOptions =
   }
   if (instructions) out.instructions = instructions
   if (tools && tools.length) out.tools = tools
-  if (req.max_tokens) out.max_output_tokens = req.max_tokens
   if (opts.sessionId) out.prompt_cache_key = opts.sessionId
   const effort = req.output_config?.effort
   if (effort) out.reasoning = { effort }
