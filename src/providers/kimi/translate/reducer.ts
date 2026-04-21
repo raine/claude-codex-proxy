@@ -1,5 +1,4 @@
 import { parseSseStream } from "../../../sse.ts"
-import type { Logger } from "../../../log.ts"
 
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
@@ -73,7 +72,6 @@ export interface ReducerStats {
 
 export async function* reduceUpstream(
   upstream: ReadableStream<Uint8Array>,
-  log: Logger,
   stats?: ReducerStats,
 ): AsyncGenerator<ReducerEvent> {
   let nextBlockIndex = 0
@@ -116,17 +114,6 @@ export async function* reduceUpstream(
       chunk = JSON.parse(data) as StreamChunk
     } catch {
       continue
-    }
-
-    if (VERBOSE) {
-      const choice = chunk.choices?.[0]
-      const d = choice?.delta
-      log.debug("upstream chunk", {
-        hasReasoning: typeof d?.reasoning_content === "string",
-        hasContent: typeof d?.content === "string" && d.content.length > 0,
-        toolCalls: d?.tool_calls?.length,
-        finish: choice?.finish_reason ?? null,
-      })
     }
 
     if (stats) stats.chunkCount++
