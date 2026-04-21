@@ -53,8 +53,19 @@ export function translateStream(
         emit("ping", { type: "ping" })
       }
 
+      const streamStart = Date.now()
+      let firstChunkAt: number | undefined
+      let reasoningChars = 0
+      let contentChars = 0
+      let toolCount = 0
+      let finishUsage: KimiUsage | undefined
+      let finishStopReason: string | undefined
+      const stats = { chunkCount: 0 }
+
       try {
-        for await (const e of reduceUpstream(upstream, opts.log)) {
+        for await (const e of reduceUpstream(upstream, opts.log, stats)) {
+          if (firstChunkAt === undefined) firstChunkAt = Date.now()
+
           switch (e.kind) {
             case "thinking-start":
               ensureMessageStart()
@@ -65,6 +76,7 @@ export function translateStream(
               })
               break
             case "thinking-delta":
+              reasoningChars += e.text.length
               emit("content_block_delta", {
                 type: "content_block_delta",
                 index: e.index,
@@ -95,6 +107,7 @@ export function translateStream(
               })
               break
             case "text-delta":
+              contentChars += e.text.length
               emit("content_block_delta", {
                 type: "content_block_delta",
                 index: e.index,
@@ -105,6 +118,7 @@ export function translateStream(
               emit("content_block_stop", { type: "content_block_stop", index: e.index })
               break
             case "tool-start":
+              toolCount++
               activeTools.set(e.index, { id: e.id, name: e.name })
               ensureMessageStart()
               emit("content_block_start", {
@@ -131,6 +145,8 @@ export function translateStream(
               break
             case "finish":
               ensureMessageStart()
+              finishUsage = e.usage
+              finishStopReason = e.stopReason
               opts.onFinish?.({ stopReason: e.stopReason, usage: e.usage })
               emit("message_delta", {
                 type: "message_delta",
@@ -172,6 +188,16 @@ export function translateStream(
           })
         }
       } finally {
+        opts.log.debug("stream summary", {
+          chunkCount: stats.chunkCount,
+          firstChunkMs: firstChunkAt ? firstChunkAt - streamStart : undefined,
+          totalMs: Date.now() - streamStart,
+          reasoningChars,
+          contentChars,
+          toolCount,
+          stopReason: finishStopReason,
+          usage: finishUsage,
+        })
         controller.close()
       }
     },
