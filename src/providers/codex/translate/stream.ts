@@ -139,7 +139,10 @@ export function translateStream(
             activeToolNames,
             activeToolCalls,
           })
-          ensureMessageStart()
+          // If upstream fails before any content starts, emitting a synthetic
+          // message_start without a matching final usage frame can trigger
+          // Claude Code's internal usage accounting crash during /compact.
+          // In that case, surface a plain SSE error event instead.
           emit("error", {
             type: "error",
             error: {
@@ -153,7 +156,6 @@ export function translateStream(
             activeToolNames,
             activeToolCalls,
           })
-          ensureMessageStart()
           emit("error", {
             type: "error",
             error: { type: "api_error", message: String(err) },
