@@ -16,18 +16,14 @@ export const MODEL_ALIASES = new Map<string, string>([
 ])
 
 export function resolveModel(model: string): string {
-  // The CLAUDE_CODEX_PROXY_OPEN_AI_MODEL_OVERRIDE environment variable allows
-  // for the model that's used to be overridden so that regardless of whatever
-  // model is being requested by the harness, the model which is provided in
-  // that env var is always returned.
-  //
-  // This is useful in cases where you just want the claude-code harness to use
-  // a specific model all across the way.
+  // The CCP_CODEX_MODEL environment variable overrides the model so that
+  // regardless of whatever model is requested by the harness, the provided
+  // model is always used.
   if (
-    process.env.CLAUDE_CODEX_PROXY_OPEN_AI_MODEL_OVERRIDE !== undefined &&
-    process.env.CLAUDE_CODEX_PROXY_OPEN_AI_MODEL_OVERRIDE !== ""
+    process.env.CCP_CODEX_MODEL !== undefined &&
+    process.env.CCP_CODEX_MODEL !== ""
   ) {
-    return process.env.CLAUDE_CODEX_PROXY_OPEN_AI_MODEL_OVERRIDE
+    return process.env.CCP_CODEX_MODEL
   }
 
   return MODEL_ALIASES.get(model) ?? model
