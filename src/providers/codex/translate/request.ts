@@ -73,22 +73,26 @@ export interface TranslateOptions {
   sessionId?: string
 }
 
-function resolveEffort(effort?: Effort): Effort | undefined {
-  // The CLAUDE_CODEX_PROXY_OPEN_AI_EFFORT_OVERRIDE environment variable allows
-  // for the effort that's used to be overridden so that regardless of whatever
-  // effort is being requested by the harness, the effort which is provided in
-  // that env var is always returned.
-  //
-  // This is useful in cases where you just want the claude-code harness to use
-  // a specific effort all across the way.
-  if (
-    process.env.CLAUDE_CODEX_PROXY_OPEN_AI_EFFORT_OVERRIDE !== undefined &&
-    process.env.CLAUDE_CODEX_PROXY_OPEN_AI_EFFORT_OVERRIDE !== ""
-  ) {
-    return process.env.CLAUDE_CODEX_PROXY_OPEN_AI_EFFORT_OVERRIDE as Effort
-  }
+const VALID_EFFORTS = new Set<Effort>(["none", "low", "medium", "high", "xhigh"])
 
+function toCodexEffort(
+  effort: NonNullable<AnthropicRequest["output_config"]>["effort"],
+): Effort | undefined {
+  if (effort === "max") return "xhigh"
   return effort
+}
+
+function resolveEffort(effort?: Effort): Effort | undefined {
+  const override = process.env.CCP_CODEX_EFFORT
+  if (override === undefined || override === "") {
+    return effort
+  }
+  if (!VALID_EFFORTS.has(override as Effort)) {
+    throw new Error(
+      `Invalid effort override: "${override}". Must be one of: ${Array.from(VALID_EFFORTS).join(", ")}`,
+    )
+  }
+  return override as Effort
 }
 
 export function translateRequest(req: AnthropicRequest, opts: TranslateOptions = {}): ResponsesRequest {
@@ -119,7 +123,7 @@ export function translateRequest(req: AnthropicRequest, opts: TranslateOptions =
   if (instructions) out.instructions = instructions
   if (tools && tools.length) out.tools = tools
   if (opts.sessionId) out.prompt_cache_key = opts.sessionId
-  const effort = resolveEffort(req.output_config?.effort)
+  const effort = resolveEffort(toCodexEffort(req.output_config?.effort))
   if (effort) {
     out.reasoning = { effort }
     out.include = ["reasoning.encrypted_content"]
