@@ -172,6 +172,59 @@ Tradeoffs:
 - If you let the session grow too far, you may hit prompt-too-long failures
   instead of a graceful auto-compact.
 
+## Toggling between proxy and direct Anthropic
+
+If you still have an Anthropic subscription you want to fall back to, you can
+put a small wrapper in front of `claude` that only injects the proxy env vars
+when a flag file exists, plus a toggle script to flip the flag. Leave
+`~/.claude/settings.json` free of proxy env vars so direct-to-Anthropic remains
+the default.
+
+`~/.local/bin/claude` (ahead of the real `claude` on `PATH`):
+
+```bash
+#!/bin/bash
+# Wrapper that optionally routes to claude-code-proxy.
+# Active when ~/.claude/claude-code-proxy-enabled exists.
+
+if [ -f "$HOME/.claude/claude-code-proxy-enabled" ]; then
+    export ANTHROPIC_BASE_URL="http://localhost:18765"
+    export ANTHROPIC_AUTH_TOKEN="unused"
+    export ANTHROPIC_MODEL="gpt-5.4"
+    export ANTHROPIC_SMALL_FAST_MODEL="gpt-5.4-mini"
+    export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="1"
+    export DISABLE_AUTO_COMPACT=1
+fi
+
+exec "$HOME/.local/bin/claude" "$@"
+```
+
+Adjust the exec path if the real `claude` binary lives elsewhere on your
+system (e.g. `$(bun pm bin -g)/claude`, `$HOME/.claude/local/claude`).
+
+`claude-proxy-toggle` (anywhere on your `PATH`):
+
+```bash
+#!/bin/bash
+# Toggle claude-code-proxy routing for the claude wrapper.
+set -euo pipefail
+
+flag="$HOME/.claude/claude-code-proxy-enabled"
+
+if [ -f "$flag" ]; then
+    rm "$flag"
+    echo "proxy: off"
+else
+    mkdir -p "$(dirname "$flag")"
+    touch "$flag"
+    echo "proxy: on"
+fi
+```
+
+Run `claude-proxy-toggle` to flip between routing through the proxy (Codex /
+Kimi) and talking to Anthropic directly. New or continued `claude` sessions pick up
+the change immediately; existing sessions keep whatever they started with.
+
 ## Providers
 
 ### Codex (ChatGPT)
