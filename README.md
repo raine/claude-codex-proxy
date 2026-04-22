@@ -409,6 +409,8 @@ Settings are environment variables on the proxy process, not a config file.
 | `CCP_LOG_VERBOSE` | unset                            | Log full request/response bodies + every SSE event |
 | `KIMI_OAUTH_HOST` | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)        |
 | `KIMI_BASE_URL`   | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                       |
+| `CCP_CODEX_MODEL` | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
+| `CCP_CODEX_EFFORT`| unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`) |
 
 ### Files
 
