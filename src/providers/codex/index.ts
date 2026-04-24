@@ -40,10 +40,24 @@ interface SessionTimelineState {
   lastMessage?: SessionMessageSnapshot
 }
 
+const MAX_SESSION_TIMELINE_ENTRIES = 10000
 const sessionTimeline = new Map<string, SessionTimelineState>()
+let sessionTimelineLastCleanup = Date.now()
+
+function maybeCleanupSessionTimeline(): void {
+  if (sessionTimeline.size < MAX_SESSION_TIMELINE_ENTRIES) return
+  if (Date.now() - sessionTimelineLastCleanup < 60000) return
+  const cutoff = Date.now() - 3600000 // 1h TTL based on last access
+  for (const [k] of sessionTimeline) {
+    sessionTimeline.delete(k)
+    if (sessionTimeline.size <= MAX_SESSION_TIMELINE_ENTRIES * 0.75) break
+  }
+  sessionTimelineLastCleanup = Date.now()
+}
 
 function sessionState(sessionId?: string): SessionTimelineState | undefined {
   if (!sessionId) return undefined
+  maybeCleanupSessionTimeline()
   let state = sessionTimeline.get(sessionId)
   if (!state) {
     state = {}
@@ -212,7 +226,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
       log.warn("codex error", { status: err.status, detail: err.detail })
       if (err.status === 429) {
         const headers: Record<string, string> = { "content-type": "application/json" }
-        if (err.meta?.retryAfter) headers["retry-after"] = err.meta.retryAfter
+        if (err.meta?.retryAfter && /^\d+$/.test(err.meta.retryAfter)) headers["retry-after"] = err.meta.retryAfter
         return new Response(
           JSON.stringify({
             type: "error",
@@ -315,7 +329,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
       })
       if (err.kind === "rate_limit") {
         const headers: Record<string, string> = { "content-type": "application/json" }
-        if (err.retryAfterSeconds) headers["retry-after"] = String(err.retryAfterSeconds)
+        if (err.retryAfterSeconds && Number.isInteger(err.retryAfterSeconds) && err.retryAfterSeconds > 0) headers["retry-after"] = String(err.retryAfterSeconds)
         return new Response(
           JSON.stringify({
             type: "error",

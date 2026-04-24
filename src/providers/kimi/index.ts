@@ -93,7 +93,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
       log.warn("kimi error", { status: err.status, detail: err.detail })
       if (err.status === 429) {
         const headers: Record<string, string> = { "content-type": "application/json" }
-        if (err.meta?.retryAfter) headers["retry-after"] = err.meta.retryAfter
+        if (err.meta?.retryAfter && /^\d+$/.test(err.meta.retryAfter)) headers["retry-after"] = err.meta.retryAfter
         return new Response(
           JSON.stringify({
             type: "error",
@@ -156,7 +156,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
       })
       if (err.kind === "rate_limit") {
         const headers: Record<string, string> = { "content-type": "application/json" }
-        if (err.retryAfterSeconds) headers["retry-after"] = String(err.retryAfterSeconds)
+        if (err.retryAfterSeconds && Number.isInteger(err.retryAfterSeconds) && err.retryAfterSeconds > 0) headers["retry-after"] = String(err.retryAfterSeconds)
         return new Response(
           JSON.stringify({
             type: "error",

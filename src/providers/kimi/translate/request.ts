@@ -98,7 +98,7 @@ export function translateRequest(
 }
 
 function clampMaxTokens(requested: number | undefined): number {
-  if (!requested || requested <= 0) return DEFAULT_MAX_TOKENS
+  if (typeof requested !== "number" || !Number.isFinite(requested) || requested <= 0) return DEFAULT_MAX_TOKENS
   return Math.min(requested, DEFAULT_MAX_TOKENS)
 }
 
@@ -205,6 +205,14 @@ function pushUserMessages(out: KimiMessage[], blocks: AnthropicContentBlock[]): 
   flushBuffer()
 }
 
+function safeJsonStringify(value: unknown): string {
+  try {
+    return JSON.stringify(value)
+  } catch {
+    return "{}"
+  }
+}
+
 function pushAssistantMessage(out: KimiMessage[], blocks: AnthropicContentBlock[]): void {
   const textParts: string[] = []
   const thinkingParts: string[] = []
@@ -220,7 +228,7 @@ function pushAssistantMessage(out: KimiMessage[], blocks: AnthropicContentBlock[
         type: "function",
         function: {
           name: block.name,
-          arguments: JSON.stringify(block.input ?? {}),
+          arguments: safeJsonStringify(block.input ?? {}),
         },
       })
     }
@@ -245,9 +253,27 @@ export function normalizeContent(content: AnthropicMessage["content"]): Anthropi
   return content
 }
 
+function isAllowedImageUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    return u.protocol === "http:" || u.protocol === "https:"
+  } catch {
+    return false
+  }
+}
+
 function imageToUrl(block: Extract<AnthropicContentBlock, { type: "image" }>): string {
-  if (block.source.type === "url") return block.source.url
-  return `data:${block.source.media_type};base64,${block.source.data}`
+  if (!block.source || typeof block.source !== "object") return ""
+  if (block.source.type === "url") {
+    if (typeof block.source.url === "string" && isAllowedImageUrl(block.source.url)) {
+      return block.source.url
+    }
+    return ""
+  }
+  if (block.source.type === "base64" && typeof block.source.media_type === "string" && typeof block.source.data === "string") {
+    return `data:${block.source.media_type};base64,${block.source.data}`
+  }
+  return ""
 }
 
 export function toolResultContent(

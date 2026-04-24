@@ -105,6 +105,5 @@ Models:    ${models}
 
 main().catch((err) => {
   log.error("cli fatal", { err: String(err), stack: (err as Error)?.stack })
-  console.error(err)
   process.exit(1)
 })
