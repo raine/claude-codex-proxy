@@ -1,2 +1,7 @@
 node_modules/
 dist/
+*.log
+.env
+.env.*
+auth.json
+device_id
