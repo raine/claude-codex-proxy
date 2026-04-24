@@ -8,20 +8,27 @@ export function encodeSseEvent(event: string, data: unknown): string {
 }
 
 const BOUNDARY = /\r\n\r\n|\n\n|\r\r/
+const MAX_SSE_BUFFER_BYTES = 10 * 1024 * 1024 // 10 MiB
 
 export async function* parseSseStream(body: ReadableStream<Uint8Array>): AsyncGenerator<SseEvent> {
   const reader = body.getReader()
   const decoder = new TextDecoder()
   let buf = ""
+  let bufferedBytes = 0
   try {
     while (true) {
       const { value, done } = await reader.read()
       if (done) break
       buf += decoder.decode(value, { stream: true })
+      bufferedBytes += value?.length ?? 0
+      if (bufferedBytes > MAX_SSE_BUFFER_BYTES) {
+        throw new Error("SSE buffer exceeded maximum size")
+      }
       let match: RegExpExecArray | null
       while ((match = BOUNDARY.exec(buf)) !== null) {
         const raw = buf.slice(0, match.index)
         buf = buf.slice(match.index + match[0].length)
+        bufferedBytes = new TextEncoder().encode(buf).length
         const evt = parseEventBlock(raw)
         if (evt) yield evt
       }

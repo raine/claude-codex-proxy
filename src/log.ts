@@ -17,6 +17,18 @@ const REDACT_KEYS = new Set([
   "ChatGPT-Account-Id",
   "chatgpt-account-id",
   "x-api-key",
+  "password",
+  "secret",
+  "api_key",
+  "apikey",
+  "cookie",
+  "private_key",
+  "credentials",
+  "bearer",
+  "proxy-authorization",
+  "x-api-key",
+  "x-auth-token",
+  "token",
 ])
 
 function stateDir(): string {
@@ -34,9 +46,9 @@ let rotating: Promise<void> | undefined
 async function ensureStream(): Promise<WriteStream> {
   if (stream) return stream
   const dir = stateDir()
-  await mkdir(dir, { recursive: true })
+  await mkdir(dir, { recursive: true, mode: 0o700 })
   const file = join(dir, "proxy.log")
-  stream = createWriteStream(file, { flags: "a" })
+  stream = createWriteStream(file, { flags: "a", mode: 0o600 })
   return stream
 }
 
@@ -45,6 +57,7 @@ async function maybeRotate(): Promise<void> {
   rotating = (async () => {
     try {
       const dir = stateDir()
+      await mkdir(dir, { recursive: true, mode: 0o700 }).catch(() => undefined)
       const file = join(dir, "proxy.log")
       const s = await stat(file).catch(() => undefined)
       if (!s || s.size < MAX_LOG_BYTES) return
@@ -65,7 +78,7 @@ async function maybeRotate(): Promise<void> {
 
 const VERBOSE = !!process.env.CCP_LOG_VERBOSE
 
-function redact(value: unknown, depth = 0): unknown {
+function redact(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
   if (depth > 6) return "[depth-limit]"
   if (value == null) return value
   if (typeof value === "string") {
@@ -73,13 +86,15 @@ function redact(value: unknown, depth = 0): unknown {
     return value
   }
   if (typeof value !== "object") return value
-  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1))
+  if (Array.isArray(value)) return value.map((v) => redact(v, depth + 1, seen))
+  if (seen.has(value)) return "[circular]"
+  seen.add(value)
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
     if (REDACT_KEYS.has(k)) {
       out[k] = typeof v === "string" ? `[redacted len=${v.length}]` : "[redacted]"
     } else {
-      out[k] = redact(v, depth + 1)
+      out[k] = redact(v, depth + 1, seen)
     }
   }
   return out
