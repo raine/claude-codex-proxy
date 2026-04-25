@@ -109,7 +109,7 @@ export async function runBrowserLogin(): Promise<TokenResponse> {
           reject(err)
         })
     })
-    server.listen(OAUTH_PORT, () => {
+    server.listen(OAUTH_PORT, "127.0.0.1", () => {
       console.log(`Open this URL in your browser to authorize:\n\n  ${authUrl}\n`)
     })
     server.on("error", reject)
