@@ -1,5 +1,9 @@
 # Changelog
 
+## v0.0.7 (2026-04-25)
+
+- Some security hardening inspired by [#5](https://github.com/raine/claude-code-proxy/pull/5)
+
 ## v0.0.6 (2026-04-25)
 
 - Added support for `gpt-5.5`, and `opus`/`claude-opus-4-7` aliases now map to
