@@ -44,7 +44,7 @@ async function refreshNow(current: StoredAuth): Promise<StoredAuth> {
       client_id: CLIENT_ID,
     }).toString(),
   })
-  if (!resp.ok) throw new Error(`Token refresh failed: ${resp.status} ${await resp.text()}`)
+  if (!resp.ok) throw new Error(`Token refresh failed: ${resp.status}`)
   const tokens = (await resp.json()) as TokenResponse
   const accountId = extractAccountId(tokens) || current.accountId
   const next: StoredAuth = {

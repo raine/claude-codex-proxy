@@ -119,15 +119,14 @@ async function refreshNow(current: StoredAuth): Promise<StoredAuth> {
     }
 
     if (!RETRYABLE_STATUSES.has(resp.status)) {
-      const text = await resp.text().catch(() => "")
-      throw new Error(`Token refresh failed: ${resp.status} ${text}`)
+      throw new Error(`Token refresh failed: ${resp.status}`)
     }
 
     lastErr = new Error(`Token refresh failed: ${resp.status}`)
     log.warn("refresh retryable error", { attempt, status: resp.status })
     await backoff(attempt)
   }
-  throw new Error(`Token refresh failed after ${MAX_REFRESH_ATTEMPTS} attempts: ${lastErr}`)
+  throw new Error(`Token refresh failed after ${MAX_REFRESH_ATTEMPTS} attempts`)
 }
 
 function backoff(attempt: number): Promise<void> {
