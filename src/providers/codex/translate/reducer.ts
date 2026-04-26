@@ -92,7 +92,8 @@ export async function* reduceUpstream(
     let p: any
     try {
       p = JSON.parse(evt.data)
-    } catch {
+    } catch (err) {
+      log.warn("upstream sse: invalid json", { err: String(err), preview: evt.data.slice(0, 200) })
       continue
     }
     const t: string = p.type || evt.event || ""

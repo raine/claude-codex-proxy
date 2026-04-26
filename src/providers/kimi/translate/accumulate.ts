@@ -49,7 +49,7 @@ export async function accumulateResponse(
   let toolCount = 0
   const stats = { chunkCount: 0 }
 
-  for await (const e of reduceUpstream(upstream, stats)) {
+  for await (const e of reduceUpstream(upstream, stats, opts.log)) {
     switch (e.kind) {
       case "thinking-start":
         blocks.set(e.index, { kind: "thinking", text: "" })

@@ -68,7 +68,7 @@ export function translateStream(
       const stats = { chunkCount: 0 }
 
       try {
-        for await (const e of reduceUpstream(upstream, stats)) {
+        for await (const e of reduceUpstream(upstream, stats, opts.log)) {
           if (firstChunkAt === undefined) firstChunkAt = Date.now()
 
           switch (e.kind) {
