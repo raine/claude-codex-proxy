@@ -17,7 +17,7 @@ export const REDACT_KEYS = new Set([
   "x-api-key",
 ])
 
-function stateDir(): string {
+export function stateDir(): string {
   const base = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state")
   return join(base, "claude-code-proxy")
 }
