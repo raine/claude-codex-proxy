@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
 import { startServer } from "./server.ts"
 import { createLogger, logDir } from "./log.ts"
+import { port as configPort } from "./config.ts"
 import {
   allProviders,
   allSupportedModels,
@@ -24,7 +25,7 @@ async function main() {
   }
 
   if (!first || first === "serve") {
-    const port = Number(process.env.PORT ?? 18765)
+    const port = configPort()
     startServer({ port })
     console.log(`Proxy listening on http://localhost:${port}`)
     console.log(`Logs: ${logDir()}/proxy.log`)
@@ -89,7 +90,7 @@ function usageAndExit(): never {
     .map((m) => `${m.model} (${m.provider})`)
     .join(", ")
   console.log(`Usage:
-  claude-code-proxy serve                      Run proxy (PORT env, default 18765)
+  claude-code-proxy serve                      Run proxy (PORT env or config.json port, default 18765)
                                                Upstream is chosen per-request from ANTHROPIC_MODEL.
   claude-code-proxy <provider> auth login      Browser OAuth
   claude-code-proxy <provider> auth device     Device-code OAuth

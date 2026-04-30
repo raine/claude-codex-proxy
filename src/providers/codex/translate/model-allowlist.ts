@@ -1,3 +1,5 @@
+import { codexModel } from "../../../config.ts"
+
 export const ALLOWED_MODELS = new Set([
   "gpt-5.2",
   "gpt-5.3-codex",
@@ -17,15 +19,12 @@ export const MODEL_ALIASES = new Map<string, string>([
 ])
 
 export function resolveModel(model: string): string {
-  // The CCP_CODEX_MODEL environment variable overrides the model so that
-  // regardless of whatever model is requested by the harness, the provided
-  // model is always used.
-  if (
-    process.env.CCP_CODEX_MODEL !== undefined &&
-    process.env.CCP_CODEX_MODEL !== ""
-  ) {
-    return process.env.CCP_CODEX_MODEL
-  }
+  // CCP_CODEX_MODEL (env) or codex.model (config.json) overrides the model
+  // so that regardless of whatever model is requested by the harness, the
+  // provided model is always used. Empty values fall through to alias
+  // resolution.
+  const override = codexModel()
+  if (override !== undefined) return override
 
   return MODEL_ALIASES.get(model) ?? model
 }

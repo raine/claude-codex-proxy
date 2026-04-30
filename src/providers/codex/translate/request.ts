@@ -6,6 +6,7 @@ import type {
   AnthropicTextBlock,
   AnthropicTool,
 } from "../../../anthropic/schema.ts"
+import { codexEffort } from "../../../config.ts"
 
 export type Effort = "none" | "low" | "medium" | "high" | "xhigh"
 
@@ -93,8 +94,8 @@ function toCodexEffort(
 }
 
 function resolveEffort(effort?: Effort): Effort | undefined {
-  const override = process.env.CCP_CODEX_EFFORT
-  if (override === undefined || override === "") {
+  const override = codexEffort()
+  if (override === undefined) {
     return effort
   }
   if (!VALID_EFFORTS.has(override as Effort)) {

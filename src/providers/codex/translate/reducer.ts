@@ -1,7 +1,6 @@
 import { parseSseStream } from "../../../sse.ts"
 import type { Logger } from "../../../log.ts"
-
-const VERBOSE = !!process.env.CCP_LOG_VERBOSE
+import { logVerbose } from "../../../config.ts"
 
 export class UpstreamStreamError extends Error {
   constructor(
@@ -98,7 +97,7 @@ export async function* reduceUpstream(
     }
     const t: string = p.type || evt.event || ""
 
-    if (VERBOSE) log.debug("upstream event", { type: t, output_index: p.output_index, item_id: p.item_id })
+    if (logVerbose()) log.debug("upstream event", { type: t, output_index: p.output_index, item_id: p.item_id })
 
     if (t === "codex.rate_limits") {
       if (p.rate_limits?.limit_reached) {

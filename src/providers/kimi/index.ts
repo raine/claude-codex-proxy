@@ -14,8 +14,7 @@ import { KimiError, postKimi } from "./client.ts"
 import { runDeviceLogin } from "./auth/login.ts"
 import { persistInitialTokens } from "./auth/manager.ts"
 import { loadAuth, clearAuth, authPath } from "./auth/token-store.ts"
-
-const VERBOSE = !!process.env.CCP_LOG_VERBOSE
+import { logVerbose } from "../../config.ts"
 
 function jsonError(status: number, type: string, message: string): Response {
   return new Response(JSON.stringify({ type: "error", error: { type, message } }), {
@@ -49,7 +48,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
     stream: wantStream,
     requestedMaxTokens: body.max_tokens,
   })
-  if (VERBOSE) log.debug("anthropic request body", { body })
+  if (logVerbose()) log.debug("anthropic request body", { body })
 
   const resolvedModel = resolveModel(body.model)
   try {
@@ -83,7 +82,7 @@ async function handleMessages(body: AnthropicRequest, ctx: RequestContext): Prom
     thinking: translated.thinking?.type,
     maxTokens: translated.max_tokens,
   })
-  if (VERBOSE) log.debug("translated request body", { body: translated })
+  if (logVerbose()) log.debug("translated request body", { body: translated })
 
   let upstream
   try {

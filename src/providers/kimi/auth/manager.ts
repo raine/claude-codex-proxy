@@ -1,4 +1,4 @@
-import { CLIENT_ID, OAUTH_HOST, REFRESH_MARGIN_MS } from "./constants.ts"
+import { CLIENT_ID, oauthHost, REFRESH_MARGIN_MS } from "./constants.ts"
 import { commonHeaders } from "./headers.ts"
 import { extractUserId } from "./jwt.ts"
 import type { TokenResponse } from "./login.ts"
@@ -92,7 +92,7 @@ async function refreshNow(current: StoredAuth): Promise<StoredAuth> {
   for (let attempt = 0; attempt < MAX_REFRESH_ATTEMPTS; attempt++) {
     let resp: Response
     try {
-      resp = await fetch(`${OAUTH_HOST}/api/oauth/token`, {
+      resp = await fetch(`${oauthHost()}/api/oauth/token`, {
         method: "POST",
         headers: { ...headers, "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({

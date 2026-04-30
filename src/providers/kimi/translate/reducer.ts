@@ -1,8 +1,6 @@
 import { parseSseStream } from "../../../sse.ts"
 import type { Logger } from "../../../log.ts"
 
-const VERBOSE = !!process.env.CCP_LOG_VERBOSE
-
 export class UpstreamStreamError extends Error {
   constructor(
     public kind: "rate_limit" | "failed",

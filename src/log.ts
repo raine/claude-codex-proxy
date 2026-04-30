@@ -1,7 +1,8 @@
 import { mkdir, appendFile, stat, rename } from "node:fs/promises"
 import { createWriteStream, type WriteStream } from "node:fs"
 import { join } from "node:path"
-import { homedir } from "node:os"
+import { stateDir } from "./paths.ts"
+import { logStderr, logVerbose } from "./config.ts"
 
 const MAX_LOG_BYTES = 20 * 1024 * 1024 // 20 MiB
 export const REDACT_KEYS = new Set([
@@ -16,11 +17,6 @@ export const REDACT_KEYS = new Set([
   "chatgpt-account-id",
   "x-api-key",
 ])
-
-function stateDir(): string {
-  const base = process.env.XDG_STATE_HOME || join(homedir(), ".local", "state")
-  return join(base, "claude-code-proxy")
-}
 
 export function logDir(): string {
   return stateDir()
@@ -61,13 +57,11 @@ async function maybeRotate(): Promise<void> {
   return rotating
 }
 
-const VERBOSE = !!process.env.CCP_LOG_VERBOSE
-
 function redact(value: unknown, depth = 0): unknown {
   if (depth > 6) return "[depth-limit]"
   if (value == null) return value
   if (typeof value === "string") {
-    if (!VERBOSE && value.length > 4000) return value.slice(0, 4000) + `…[${value.length - 4000} more]`
+    if (!logVerbose() && value.length > 4000) return value.slice(0, 4000) + `…[${value.length - 4000} more]`
     return value
   }
   if (typeof value !== "object") return value
@@ -100,7 +94,7 @@ async function write(level: Level, service: string, msg: string, fields?: Record
   } catch {
     // swallow; also print to stderr for visibility
   }
-  if (level === "error" || level === "warn" || process.env.CCP_LOG_STDERR) {
+  if (level === "error" || level === "warn" || logStderr()) {
     process.stderr.write(line + "\n")
   }
 }

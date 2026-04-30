@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./auth/constants.ts"
+import { apiBaseUrl } from "./auth/constants.ts"
 import { commonHeaders } from "./auth/headers.ts"
 import { forceRefresh, getAuth, KimiAuthUnauthorizedError } from "./auth/manager.ts"
 import type { Logger } from "../../log.ts"
@@ -100,14 +100,14 @@ async function doFetch(
 
   const bodyJson = JSON.stringify(body)
   log.debug("posting to kimi", {
-    url: `${API_BASE_URL}/chat/completions`,
+    url: `${apiBaseUrl()}/chat/completions`,
     model: body.model,
     messageCount: body.messages.length,
     toolCount: body.tools?.length ?? 0,
     requestBodyBytes: new TextEncoder().encode(bodyJson).length,
   })
 
-  return fetch(`${API_BASE_URL}/chat/completions`, {
+  return fetch(`${apiBaseUrl()}/chat/completions`, {
     method: "POST",
     headers,
     body: bodyJson,

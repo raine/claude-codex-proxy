@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile, unlink, rename } from "node:fs/promises"
 import { dirname, join } from "node:path"
-import { homedir } from "node:os"
 import { keychainGet, keychainSet, keychainDelete } from "../../../keychain.ts"
+import { configDir, legacyConfigDir } from "../../../paths.ts"
 
 export interface StoredAuth {
   access: string
@@ -10,8 +10,12 @@ export interface StoredAuth {
   accountId?: string
 }
 
-const DIR = join(homedir(), ".config", "claude-code-proxy", "codex")
-const FILE = join(DIR, "auth.json")
+function file(): string {
+  return join(configDir(), "codex", "auth.json")
+}
+function legacyFile(): string {
+  return join(legacyConfigDir(), "codex", "auth.json")
+}
 const KEYCHAIN_SERVICE = "claude-code-proxy.codex"
 const KEYCHAIN_ACCOUNT = "auth"
 
@@ -22,8 +26,17 @@ export async function loadAuth(): Promise<StoredAuth | undefined> {
     return JSON.parse(raw) as StoredAuth
   }
 
+  const primary = file()
   try {
-    const raw = await readFile(FILE, "utf8")
+    const raw = await readFile(primary, "utf8")
+    return JSON.parse(raw) as StoredAuth
+  } catch (err: any) {
+    if (err?.code !== "ENOENT") throw err
+  }
+  const legacy = legacyFile()
+  if (legacy === primary) return undefined
+  try {
+    const raw = await readFile(legacy, "utf8")
     return JSON.parse(raw) as StoredAuth
   } catch (err: any) {
     if (err?.code === "ENOENT") return undefined
@@ -37,10 +50,11 @@ export async function saveAuth(auth: StoredAuth): Promise<void> {
     return
   }
 
-  await mkdir(dirname(FILE), { recursive: true, mode: 0o700 })
-  const tmp = `${FILE}.${process.pid}.${Date.now()}.tmp`
+  const path = file()
+  await mkdir(dirname(path), { recursive: true, mode: 0o700 })
+  const tmp = `${path}.${process.pid}.${Date.now()}.tmp`
   await writeFile(tmp, JSON.stringify(auth, null, 2), { encoding: "utf8", mode: 0o600 })
-  await rename(tmp, FILE)
+  await rename(tmp, path)
 }
 
 export async function clearAuth(): Promise<void> {
@@ -49,13 +63,15 @@ export async function clearAuth(): Promise<void> {
     return
   }
 
-  try {
-    await unlink(FILE)
-  } catch (err: any) {
-    if (err?.code !== "ENOENT") throw err
+  for (const path of [file(), legacyFile()]) {
+    try {
+      await unlink(path)
+    } catch (err: any) {
+      if (err?.code !== "ENOENT") throw err
+    }
   }
 }
 
 export function authPath(): string {
-  return process.platform === "darwin" ? "macOS Keychain" : FILE
+  return process.platform === "darwin" ? "macOS Keychain" : file()
 }

@@ -427,35 +427,74 @@ The proxy speaks enough of the Anthropic API for Claude Code:
 
 ## Configuration
 
-Settings are environment variables on the proxy process, not a config file.
+Settings can come from either environment variables or a `config.json` file.
+Precedence per setting: **env var > config file > built-in default**. The
+config file is optional — env-var-only setups continue to work unchanged.
 
-| Variable               | Default                          | Purpose                                                                                        |
-| ---------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------- |
-| `PORT`                 | `18765`                          | Proxy listen port                                                                              |
-| `XDG_STATE_HOME`       | `~/.local/state`                 | Base dir for `proxy.log`                                                                       |
-| `CCP_LOG_STDERR`       | unset                            | Also mirror log lines to stderr                                                                |
-| `CCP_LOG_VERBOSE`      | unset                            | Log full request/response bodies + every SSE event                                             |
-| `KIMI_OAUTH_HOST`      | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)                                                    |
-| `KIMI_BASE_URL`        | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                                                                   |
-| `CCP_CODEX_MODEL`      | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
-| `CCP_CODEX_EFFORT`     | unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`)   |
-| `CCP_CODEX_ORIGINATOR` | `claude-code-proxy`              | Override the `originator` header sent to Codex                                                 |
-| `CCP_CODEX_USER_AGENT` | `claude-code-proxy/<version>`    | Override the `User-Agent` header sent to Codex                                                 |
-| `CCP_KIMI_USER_AGENT`  | `KimiCLI/1.37.0`                 | Override the `User-Agent` header sent to Kimi                                                  |
-| `CCP_ORIGINATOR`       | `claude-code-proxy`              | Fallback for `CCP_CODEX_ORIGINATOR`                                                            |
-| `CCP_USER_AGENT`       | unset                            | Fallback for `CCP_CODEX_USER_AGENT` and `CCP_KIMI_USER_AGENT`                                  |
+The file lives at `~/.config/claude-code-proxy/config.json` on macOS (the same
+directory the auth tokens use, deliberately not `~/Library`) and at
+`${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-proxy/config.json` elsewhere.
+
+```json
+{
+  "port": 18765,
+  "codex": {
+    "originator": "claude-code-proxy",
+    "userAgent": "claude-code-proxy/dev",
+    "model": "gpt-5.4",
+    "effort": "medium"
+  },
+  "kimi": {
+    "userAgent": "KimiCLI/1.37.0",
+    "oauthHost": "https://auth.kimi.com",
+    "baseUrl": "https://api.kimi.com/coding/v1"
+  },
+  "log": {
+    "stderr": false,
+    "verbose": false
+  }
+}
+```
+
+| Variable               | Config key          | Default                          | Purpose                                                                                        |
+| ---------------------- | ------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `PORT`                 | `port`              | `18765`                          | Proxy listen port                                                                              |
+| `XDG_STATE_HOME`       | —                   | `~/.local/state`                 | Base dir for `proxy.log`                                                                       |
+| `CCP_LOG_STDERR`       | `log.stderr`        | unset                            | Also mirror log lines to stderr                                                                |
+| `CCP_LOG_VERBOSE`      | `log.verbose`       | unset                            | Log full request/response bodies + every SSE event                                             |
+| `KIMI_OAUTH_HOST`      | `kimi.oauthHost`    | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)                                                    |
+| `KIMI_BASE_URL`        | `kimi.baseUrl`      | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                                                                   |
+| `CCP_CODEX_MODEL`      | `codex.model`       | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
+| `CCP_CODEX_EFFORT`     | `codex.effort`      | unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`)   |
+| `CCP_CODEX_ORIGINATOR` | `codex.originator`  | `claude-code-proxy`              | Override the `originator` header sent to Codex                                                 |
+| `CCP_CODEX_USER_AGENT` | `codex.userAgent`   | `claude-code-proxy/<version>`    | Override the `User-Agent` header sent to Codex                                                 |
+| `CCP_KIMI_USER_AGENT`  | `kimi.userAgent`    | `KimiCLI/1.37.0`                 | Override the `User-Agent` header sent to Kimi                                                  |
+| `CCP_ORIGINATOR`       | —                   | `claude-code-proxy`              | Fallback for `CCP_CODEX_ORIGINATOR`                                                            |
+| `CCP_USER_AGENT`       | —                   | unset                            | Fallback for `CCP_CODEX_USER_AGENT` and `CCP_KIMI_USER_AGENT`                                  |
+
+A malformed `config.json` is reported on stderr and ignored; defaults are used
+in its place. Invalid types for individual keys are warned and skipped without
+affecting other keys.
 
 ### Files
 
 - `$XDG_STATE_HOME/claude-code-proxy/proxy.log` — JSON-lines log, rotated at 20
   MiB. Secrets (`authorization`, `access`, `refresh`, `id_token`,
   `ChatGPT-Account-Id`, …) are redacted before write.
-- `~/.config/claude-code-proxy/codex/auth.json` — codex tokens (non-macOS; macOS
-  uses Keychain under service `claude-code-proxy.codex`).
-- `~/.config/claude-code-proxy/kimi/auth.json` — kimi tokens (non-macOS; macOS
-  uses Keychain under service `claude-code-proxy.kimi`).
-- `~/.config/claude-code-proxy/kimi/device_id` — persistent UUID bound into the
-  Kimi JWT at login. Reused for the lifetime of the install.
+- `~/.config/claude-code-proxy/config.json` (macOS) or
+  `${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-proxy/config.json` — optional
+  configuration file (see table above).
+- `${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-proxy/codex/auth.json` — codex
+  tokens (non-macOS; macOS uses Keychain under service
+  `claude-code-proxy.codex`). Pre-existing files at the legacy path
+  `~/.config/claude-code-proxy/codex/auth.json` are read as a fallback so
+  existing logins survive setting `XDG_CONFIG_HOME`.
+- `${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-proxy/kimi/auth.json` — kimi
+  tokens (non-macOS; macOS uses Keychain under service
+  `claude-code-proxy.kimi`). Same legacy-path fallback as above.
+- `${XDG_CONFIG_HOME:-$HOME/.config}/claude-code-proxy/kimi/device_id` —
+  persistent UUID bound into the Kimi JWT at login. Reused for the lifetime
+  of the install.
 
 ## Limitations
 
