@@ -1,4 +1,6 @@
 import { CODEX_API_ENDPOINT, ORIGINATOR as ORIGINATOR_DEFAULT } from "./auth/constants.ts"
+declare const BUILD_VERSION: string | undefined
+const PROXY_VERSION = typeof BUILD_VERSION === "string" ? BUILD_VERSION : "dev"
 import { forceRefresh, getAuth } from "./auth/manager.ts"
 import type { Logger } from "../../log.ts"
 import type { RequestContext } from "../types.ts"
@@ -65,7 +67,7 @@ async function doFetch(
     originator: process.env.CCP_CODEX_ORIGINATOR ?? process.env.CCP_ORIGINATOR ?? ORIGINATOR_DEFAULT,
     "openai-beta": "responses=experimental",
   })
-  const userAgent = process.env.CCP_CODEX_USER_AGENT ?? process.env.CCP_USER_AGENT
+  const userAgent = process.env.CCP_CODEX_USER_AGENT ?? process.env.CCP_USER_AGENT ?? `claude-code-proxy/${PROXY_VERSION}`
   if (userAgent) headers.set("User-Agent", userAgent)
   if (accountId) headers.set("ChatGPT-Account-Id", accountId)
   if (sessionId) {

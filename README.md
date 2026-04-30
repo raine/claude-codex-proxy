@@ -429,21 +429,21 @@ The proxy speaks enough of the Anthropic API for Claude Code:
 
 Settings are environment variables on the proxy process, not a config file.
 
-| Variable          | Default                          | Purpose                                            |
-| ----------------- | -------------------------------- | -------------------------------------------------- |
-| `PORT`            | `18765`                          | Proxy listen port                                  |
-| `XDG_STATE_HOME`  | `~/.local/state`                 | Base dir for `proxy.log`                           |
-| `CCP_LOG_STDERR`  | unset                            | Also mirror log lines to stderr                    |
-| `CCP_LOG_VERBOSE` | unset                            | Log full request/response bodies + every SSE event |
-| `KIMI_OAUTH_HOST` | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)        |
-| `KIMI_BASE_URL`   | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                       |
-| `CCP_CODEX_MODEL` | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
-| `CCP_CODEX_EFFORT`| unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`) |
-| `CCP_CODEX_ORIGINATOR` | `claude-code-proxy`      | Override the `originator` header sent to Codex |
-| `CCP_CODEX_USER_AGENT` | unset                         | Override the `User-Agent` header sent to Codex (not sent by default) |
-| `CCP_KIMI_USER_AGENT`  | `KimiCLI/1.37.0`          | Override the `User-Agent` header sent to Kimi |
-| `CCP_ORIGINATOR`       | `claude-code-proxy`      | Fallback for `CCP_CODEX_ORIGINATOR` |
-| `CCP_USER_AGENT`       | unset                         | Fallback for `CCP_CODEX_USER_AGENT` and `CCP_KIMI_USER_AGENT` |
+| Variable               | Default                          | Purpose                                                                                        |
+| ---------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `PORT`                 | `18765`                          | Proxy listen port                                                                              |
+| `XDG_STATE_HOME`       | `~/.local/state`                 | Base dir for `proxy.log`                                                                       |
+| `CCP_LOG_STDERR`       | unset                            | Also mirror log lines to stderr                                                                |
+| `CCP_LOG_VERBOSE`      | unset                            | Log full request/response bodies + every SSE event                                             |
+| `KIMI_OAUTH_HOST`      | `https://auth.kimi.com`          | Override Kimi's OAuth host (debugging only)                                                    |
+| `KIMI_BASE_URL`        | `https://api.kimi.com/coding/v1` | Override Kimi's API base URL                                                                   |
+| `CCP_CODEX_MODEL`      | unset                            | Force all Codex requests to this model (`gpt-5.2`, `gpt-5.3-codex`, `gpt-5.4`, `gpt-5.4-mini`) |
+| `CCP_CODEX_EFFORT`     | unset                            | Force all Codex requests to this reasoning effort (`none`, `low`, `medium`, `high`, `xhigh`)   |
+| `CCP_CODEX_ORIGINATOR` | `claude-code-proxy`              | Override the `originator` header sent to Codex                                                 |
+| `CCP_CODEX_USER_AGENT` | `claude-code-proxy/<version>`    | Override the `User-Agent` header sent to Codex                                                 |
+| `CCP_KIMI_USER_AGENT`  | `KimiCLI/1.37.0`                 | Override the `User-Agent` header sent to Kimi                                                  |
+| `CCP_ORIGINATOR`       | `claude-code-proxy`              | Fallback for `CCP_CODEX_ORIGINATOR`                                                            |
+| `CCP_USER_AGENT`       | unset                            | Fallback for `CCP_CODEX_USER_AGENT` and `CCP_KIMI_USER_AGENT`                                  |
 
 ### Files
 
