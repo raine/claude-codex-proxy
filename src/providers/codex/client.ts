@@ -62,10 +62,10 @@ async function doFetch(
     "Content-Type": "application/json",
     accept: "text/event-stream",
     authorization: `Bearer ${accessToken}`,
-    originator: process.env.CCP_ORIGINATOR ?? ORIGINATOR_DEFAULT,
+    originator: process.env.CCP_CODEX_ORIGINATOR ?? process.env.CCP_ORIGINATOR ?? ORIGINATOR_DEFAULT,
     "openai-beta": "responses=experimental",
   })
-  const userAgent = process.env.CCP_USER_AGENT
+  const userAgent = process.env.CCP_CODEX_USER_AGENT ?? process.env.CCP_USER_AGENT
   if (userAgent) headers.set("User-Agent", userAgent)
   if (accountId) headers.set("ChatGPT-Account-Id", accountId)
   if (sessionId) {

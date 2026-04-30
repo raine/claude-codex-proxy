@@ -25,6 +25,6 @@ export async function commonHeaders(): Promise<Record<string, string>> {
     "X-Msh-Device-Model": asciiOnly(deviceModel()),
     "X-Msh-Os-Version": asciiOnly(release()),
     "X-Msh-Device-Id": deviceId,
-    "User-Agent": process.env.CCP_USER_AGENT ?? `KimiCLI/${KIMI_CLI_VERSION}`,
+    "User-Agent": process.env.CCP_KIMI_USER_AGENT ?? process.env.CCP_USER_AGENT ?? `KimiCLI/${KIMI_CLI_VERSION}`,
   }
 }
