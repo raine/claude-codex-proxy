@@ -210,6 +210,20 @@ Run `claude-proxy-toggle` to flip between routing through the proxy (Codex /
 Kimi) and talking to Anthropic directly. New or continued `claude` sessions pick up
 the change immediately; existing sessions keep whatever they started with.
 
+## Local usage endpoint
+
+When authenticated with Codex, the proxy exposes a local status endpoint for
+ChatGPT/Codex plan usage:
+
+```sh
+curl http://localhost:18765/_claude-code-proxy/usage | jq
+```
+
+The endpoint returns normalized primary and secondary usage windows, including
+used percentage, window duration, and reset time. It is intended for statusline
+or monitoring integrations and is cached briefly by the proxy to avoid polling
+ChatGPT on every prompt render.
+
 ## Providers
 
 ### Codex (ChatGPT)
