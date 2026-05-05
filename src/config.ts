@@ -16,6 +16,7 @@ export interface FileConfig {
     userAgent?: string
     model?: string
     effort?: string
+    defaultEffort?: string
   }
   kimi?: {
     userAgent?: string
@@ -87,11 +88,12 @@ function validate(raw: unknown): FileConfig {
     return acc as NonNullable<FileConfig[K]>
   }
 
-  const codex = validateStringSection("codex", ["originator", "userAgent", "model", "effort"], {
+  const codex = validateStringSection("codex", ["originator", "userAgent", "model", "effort", "defaultEffort"], {
     originator: "string",
     userAgent: "string",
     model: "string",
     effort: "string",
+    defaultEffort: "string",
   })
   if (codex) out.codex = codex
 
@@ -182,7 +184,7 @@ export function codexUserAgent(defaultValue: string): string {
 
 // Returns undefined when neither env nor file specifies a value. Empty
 // string in env is intentionally treated as "unset" (preserves the
-// long-standing CCP_CODEX_MODEL escape hatch).
+// long-standing model/effort escape hatches).
 export function codexModel(): string | undefined {
   const c = getConfig()
   return emptyOrUnset(c.env.CCP_CODEX_MODEL) ?? emptyOrUnset(c.file.codex?.model)
@@ -191,6 +193,11 @@ export function codexModel(): string | undefined {
 export function codexEffort(): string | undefined {
   const c = getConfig()
   return emptyOrUnset(c.env.CCP_CODEX_EFFORT) ?? emptyOrUnset(c.file.codex?.effort)
+}
+
+export function codexDefaultEffort(): string | undefined {
+  const c = getConfig()
+  return emptyOrUnset(c.env.CCP_CODEX_DEFAULT_EFFORT) ?? emptyOrUnset(c.file.codex?.defaultEffort)
 }
 
 export function kimiUserAgent(defaultValue: string): string {

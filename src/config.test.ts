@@ -9,6 +9,7 @@ import {
   codexUserAgent,
   codexModel,
   codexEffort,
+  codexDefaultEffort,
   kimiUserAgent,
   kimiOauthHost,
   kimiBaseUrl,
@@ -43,6 +44,7 @@ describe("config defaults", () => {
     expect(codexUserAgent("default-ua")).toBe("default-ua")
     expect(codexModel()).toBeUndefined()
     expect(codexEffort()).toBeUndefined()
+    expect(codexDefaultEffort()).toBeUndefined()
     expect(kimiUserAgent("default-kimi-ua")).toBe("default-kimi-ua")
     expect(kimiOauthHost()).toBe("https://auth.kimi.com")
     expect(kimiBaseUrl()).toBe("https://api.kimi.com/coding/v1")
@@ -99,6 +101,15 @@ describe("env overrides file", () => {
     expect(codexUserAgent("default")).toBe("from-env")
   })
 
+  it("CCP_CODEX_DEFAULT_EFFORT env wins over config", () => {
+    writeFileSync(
+      configPath,
+      JSON.stringify({ codex: { defaultEffort: "medium" } }),
+    )
+    setEnv({ CCP_CODEX_DEFAULT_EFFORT: "high" })
+    expect(codexDefaultEffort()).toBe("high")
+  })
+
   it("CCP_USER_AGENT env (generic fallback) is preferred over file", () => {
     writeFileSync(
       configPath,
@@ -126,6 +137,12 @@ describe("empty-string semantics", () => {
   it("empty CCP_CODEX_MODEL env with no file value returns undefined", () => {
     setEnv({ CCP_CODEX_MODEL: "" })
     expect(codexModel()).toBeUndefined()
+  })
+
+  it("empty CCP_CODEX_DEFAULT_EFFORT env falls through to file value", () => {
+    writeFileSync(configPath, JSON.stringify({ codex: { defaultEffort: "low" } }))
+    setEnv({ CCP_CODEX_DEFAULT_EFFORT: "" })
+    expect(codexDefaultEffort()).toBe("low")
   })
 
   it("empty PORT env falls through to file value", () => {
